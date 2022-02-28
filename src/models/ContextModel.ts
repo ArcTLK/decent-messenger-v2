@@ -1,5 +1,5 @@
-import { User } from "./User";
+import User from "./User";
 
-export interface ContextModel {
-    user: User
+export default interface ContextModel {
+    user: User;
 }

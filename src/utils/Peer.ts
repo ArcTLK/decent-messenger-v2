@@ -1,6 +1,6 @@
 import Peer from 'peerjs';
 import { Globals } from "../Constants";
-import { PeerData } from '../models/PeerData';
+import PeerData from '../models/PeerData';
 import { ApiClient } from './ApiClient';
 
 export function connectToPeerServer(host: string, port: number): Peer {
@@ -27,7 +27,7 @@ function sendMessageToPeer(peerId: string) {
     
 }
 
-export async function sendMessageToUser(username: string) {
+export async function sendMessageToUser(username: string, message: string) {
     try {
         // Step 1: Get Peer Data from username
         const peerData = await getPeerDataFromUsername(username);
@@ -50,9 +50,10 @@ export async function sendMessageToUser(username: string) {
     
             dataConnection.on('open', () => {
                 dataConnection.send({
-                    test: 'Hi!'
+                    message
                 });
                 console.log('Sent msg to ' + username);
+                // TODO: close connection
             })   
         });
              

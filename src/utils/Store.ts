@@ -1,7 +1,7 @@
 import { createContext } from 'react';
-import { User } from '../models/User';
-import { ContextModel } from '../models/ContextModel';
-import { Action } from '../models/Action';
+import User from '../models/User';
+import ContextModel from '../models/ContextModel';
+import Action from '../models/Action';
 import { Dispatch } from 'react';
 
 interface ContextStore {

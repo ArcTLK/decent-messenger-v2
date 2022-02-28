@@ -1,5 +1,5 @@
-import { Action } from "../models/Action";
-import { ContextModel } from "../models/ContextModel";
+import Action from "../models/Action";
+import ContextModel from "../models/ContextModel";
 
 const updateState = (state: ContextModel, newState: Partial<ContextModel>): ContextModel => {
     const updatedState = {

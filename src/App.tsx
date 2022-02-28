@@ -66,9 +66,9 @@ function App() {
     }
 
     if (state && state.user && state.user.username && state.user.username !== 'test456') {
-      sendMessageToUser('test456');
+      sendMessageToUser('test456', 'Hey!');
     }    
-  });
+  }, []);
 
   return (
     <Context.Provider value={{state, dispatch}}>

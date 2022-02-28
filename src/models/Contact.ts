@@ -1,7 +1,6 @@
-export default interface User {
+export default interface Contact {
     name: string;
     username: string;
     server: string;
-    deviceKey: string;
     peerId: string;
 }
