@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer } from 'react';
+import React, { useEffect, useReducer, useState } from 'react';
 import logo from './logo.svg';
 import './App.css';
 import Reducer from './utils/Reducer';
@@ -17,7 +17,7 @@ function App() {
       console.log('Creating User');
       ApiClient.post('users', {
         name: 'Tester',
-        username: 'john12'
+        username: prompt('Enter Username')
       }).then(({ data }) => {
         dispatch({
           type: 'UpdateUser',
@@ -65,8 +65,10 @@ function App() {
       });
     }
 
-    sendMessageToUser('anant2');
-  }, []);
+    if (state && state.user && state.user.username && state.user.username !== 'test456') {
+      sendMessageToUser('test456');
+    }    
+  });
 
   return (
     <Context.Provider value={{state, dispatch}}>

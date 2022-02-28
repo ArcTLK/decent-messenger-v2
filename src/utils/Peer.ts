@@ -53,7 +53,6 @@ export async function sendMessageToUser(username: string) {
                     test: 'Hi!'
                 });
                 console.log('Sent msg to ' + username);
-                console.log("11241S");
             })   
         });
              
