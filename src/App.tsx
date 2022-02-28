@@ -1,25 +1,79 @@
-import React from 'react';
+import React, { useEffect, useReducer } from 'react';
 import logo from './logo.svg';
 import './App.css';
+import Reducer from './utils/Reducer';
+import { Context, initialState } from './utils/Store';
+import { ApiClient } from './utils/ApiClient';
+import { connectToPeerServer, sendMessageToUser, updatePeerIdInPeerServer } from './utils/Peer';
+import { Globals } from './Constants';
 
 function App() {
+  const [state, dispatch] = useReducer(Reducer, initialState);
+
+  useEffect(() => {
+    // check if user object exists
+    if (!state || !state.user || !state.user.deviceKey) {
+      // create user
+      console.log('Creating User');
+      ApiClient.post('users', {
+        name: 'Tester',
+        username: 'john12'
+      }).then(({ data }) => {
+        dispatch({
+          type: 'UpdateUser',
+          payload: data
+        });        
+
+        const peer = connectToPeerServer(Globals.api.host, Globals.api.port);
+        
+        peer.on('open', id => {
+            console.log('My peer ID is: ' + id);
+            // talk to API to update peerId
+            updatePeerIdInPeerServer(data.username, data.deviceKey, id).then(({ data }) => {
+              dispatch({
+                type: 'UpdateUser',
+                payload: data
+              });
+            });
+        });
+
+        peer.on('connection', dataConnection => {
+          dataConnection.on('data', data => {
+            console.log(data);
+          })
+        });
+      });
+    }
+    else {
+      const peer = connectToPeerServer(Globals.api.host, Globals.api.port);
+        
+      peer.on('open', id => {
+          console.log('My peer ID is: ' + id);
+          // talk to API to update peerId
+          updatePeerIdInPeerServer(state.user.username, state.user.deviceKey, id).then(({ data }) => {
+            dispatch({
+              type: 'UpdateUser',
+              payload: data
+            });
+          });
+      });
+
+      peer.on('connection', dataConnection => {
+        dataConnection.on('data', data => {
+          console.log(data);
+        })
+      });
+    }
+
+    sendMessageToUser('anant2');
+  }, []);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Context.Provider value={{state, dispatch}}>
+      <div className="__main">
+        
+      </div>
+    </Context.Provider>
   );
 }
 
