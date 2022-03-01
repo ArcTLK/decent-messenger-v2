@@ -1,8 +1,8 @@
 export const Globals = {
     api: {
         protocol: 'http',
-        host: '65.0.75.32',
-        port: 80,
+        host: 'localhost',
+        port: 8080,
         endpoint: {
             peerjs: '/peerjs',
             app: '/api'
