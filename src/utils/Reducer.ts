@@ -6,8 +6,7 @@ const updateState = (state: ContextModel, newState: Partial<ContextModel>): Cont
         ...state,
         ...newState
     };
-
-    localStorage.setItem('cached-data', JSON.stringify(updatedState));
+    
     return updatedState;
 }
 

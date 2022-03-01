@@ -13,11 +13,6 @@ export let initialState: ContextModel = {
     user: ({} as User)
 };
 
-const cachedData = localStorage.getItem('cached-data');
-if (cachedData) {
-    initialState = JSON.parse(cachedData);
-}
-
 export const Context = createContext<ContextStore>({
     state: initialState,
     dispatch: () => undefined
