@@ -1,5 +1,4 @@
 import MessageStatus from "../enums/MessageStatus";
-import Contact from "./Contact";
 
 export default interface Message {
     content: string;
@@ -9,6 +8,6 @@ export default interface Message {
         sent: Date,
         acknowledged: Date
     };
-    sender: Contact;
-    receiver: Contact;
+    sender_username: string;
+    receiver_username: string;
 }
