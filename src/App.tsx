@@ -1,16 +1,18 @@
 import React, { useEffect, useReducer, useState } from 'react';
-import logo from './logo.svg';
-import './App.css';
 import Reducer from './utils/Reducer';
 import { Context, initialState } from './utils/Store';
 import { ApiClient } from './utils/ApiClient';
 import { connectToPeerServer, listenForMessages, sendMessageToUser, updatePeerIdInPeerServer } from './utils/Peer';
 import { Globals } from './Constants';
+import { Box, Divider } from '@mui/material';
+import SideBar from './components/SideBar';
+import ChatPanel from './components/ChatPanel';
 import Database from './utils/Database';
 import User from './models/User';
 
+
 function App() {
-  const [state, dispatch] = useReducer(Reducer, initialState);
+	const [state, dispatch] = useReducer(Reducer, initialState);
 
   useEffect(() => {
     // check if user object exists
@@ -51,13 +53,17 @@ function App() {
     });
   }, []);
 
-  return (
-    <Context.Provider value={{state, dispatch}}>
-      <div className="__main">
-        
-      </div>
-    </Context.Provider>
-  );
+	return (
+		<Context.Provider value={{ state, dispatch }}>
+			<Box sx={{ display: 'flex', height: '100vh', width: '100vw', p: { md: 2 } }}>
+				<Box sx={{ display: 'flex', flexGrow: 1, boxShadow: '1px 1px 10px gray' }}>
+					<SideBar />
+					<Divider orientation="vertical" />
+					<ChatPanel />
+				</Box>
+			</Box>
+		</Context.Provider>
+	);
 }
 
 export default App;
