@@ -9,11 +9,9 @@ import SideBar from './components/SideBar';
 import ChatPanel from './components/ChatPanel';
 import Database from './utils/Database';
 import User from './models/User';
-
-
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
-const theme = createTheme({
+const themeLight = createTheme({
 	palette: {
 		primary: {
 			light: '#757ce8',
@@ -74,7 +72,7 @@ function App() {
 
 	return (
 		<Context.Provider value={{ state, dispatch }}>
-			<ThemeProvider theme={theme}>
+			<ThemeProvider theme={themeLight}>
 				<Box sx={{ display: 'flex', height: '100vh', width: '100vw', p: { md: 2 } }}>
 					<Box sx={{ display: 'flex', flexGrow: 1, boxShadow: '1px 1px 10px gray' }}>
 						<SideBar />
