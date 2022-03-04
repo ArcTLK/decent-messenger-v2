@@ -13,6 +13,14 @@ const ChatPanel = () => {
 
     const [typedMessage, setTypedMessage] = useState('');
 
+    const messagesEndRef = useRef<null | HTMLElement>(null);
+
+    useEffect(() => {
+        if(messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [state.messages, state.currentChatUser]);
+
 
     const onSendMessageButtonClick = () => {
         // console.log('Send Message:', typedMessage);
@@ -77,6 +85,7 @@ const ChatPanel = () => {
                             </Box>
                         </Box>
                     ))}
+                    <Box ref={messagesEndRef} />
                 </Box>
     
                 <Divider />
