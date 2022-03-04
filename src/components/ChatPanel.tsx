@@ -32,9 +32,9 @@ const ChatPanel = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 3 }}>
             
                 {/* ChatPanel Header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2, bgcolor: 'primary.main' }}>
                     <Avatar />
-                    <Typography variant="h6" component="div">{state.currentChatUser.name}</Typography>
+                    <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentChatUser.name}</Typography>
                 </Box>
 
                 <Divider />
@@ -42,17 +42,19 @@ const ChatPanel = () => {
                 {/* ChatPanel Messages */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, flexGrow: 1, overflow: 'auto', p: 2 }}>
                     {state.messages.filter(message => message.sender_username===state.currentChatUser.username || message.receiver_username===state.currentChatUser.username).map(message => (
-                        <Box alignSelf={(message.sender_username===state.user.username)? 'flex-end' : 'flex-start'} bgcolor={message.sender_username===state.user.username? 'primary.light' : 'secondary.light'} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, p: 1, m: 0.5, borderRadius: 2 }}>
-                            <Box>{message.content}</Box>
+                        <Box alignSelf={(message.sender_username===state.user.username)? 'flex-end' : 'flex-start'} bgcolor={message.sender_username===state.user.username? 'primary.main' : 'secondary.light'} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 2, m: 0.5, borderRadius: 2 }}>
+                            <Box color={message.sender_username===state.user.username? 'white' : 'text.primary'}>{message.content}</Box>
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'end', alignItems: 'center'}}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
+                                <Box color={message.sender_username===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
                                     {message.timestamp.sent.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </Box>
+                                <Box color={message.sender_username===state.user.username? '#d1c4e9' : 'text.secondary'}>
                                 {
                                     (message.status===MessageStatus.Pending && <AccessTimeIcon sx={{ fontSize: 16 }}/>) ||
                                     (message.status===MessageStatus.Sent && <DoneIcon sx={{ fontSize: 16 }}/>) ||
                                     (<DoneAllIcon sx={{ fontSize: 16 }}/>)
                                 }
+                                </Box>
                             </Box>
                         </Box>
                     ))}

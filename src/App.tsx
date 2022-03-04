@@ -14,16 +14,22 @@ import ChatPanel from './components/ChatPanel';
 import Database from './utils/Database';
 import User from './models/User';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { purple, grey } from '@mui/material/colors';
+import { deepPurple, grey } from '@mui/material/colors';
 
 const themeLight = createTheme({
 	palette: {
-		// primary: {
-		// 	light: grey[200],
-		// 	main: grey[400],
-		// 	dark: grey[800],
-		// 	contrastText: '#fff',
-		// }
+		primary: {
+			light: deepPurple[300],
+			main: deepPurple[500],
+			dark: deepPurple[900],
+			contrastText: '#fff',
+		},
+		secondary: {
+			light: grey[200],
+			main: grey[500],
+			dark: grey[900],
+			contrastText: '#fff',
+		}
 	},
 });
 
