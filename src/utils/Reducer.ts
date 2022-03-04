@@ -16,6 +16,10 @@ const Reducer = (state: ContextModel, action: Action): ContextModel => {
             return updateState(state, { user: { ...state.user, ...action.payload } });
         case 'UpdateCurrentChatUser':
             return updateState(state, { currentChatUser: { ...state.currentChatUser, ...action.payload } });
+        case 'UpdateContactList':
+            return updateState(state, { contactList: [ ...state.contactList, ...action.payload ] });
+        case 'UpdateMessages':
+            return updateState(state, { messages: [ ...state.messages, ...action.payload ] });
         default:
             return state;
     }
