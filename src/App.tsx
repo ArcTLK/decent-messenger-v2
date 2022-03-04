@@ -148,7 +148,7 @@ function App() {
 	if(Object.keys(state.user).length === 0) {
 		return (
 			<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw' }}>
-				<Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, borderRadius: 2, boxShadow: '1px 1px 10px gray', p: 3 }}>
+				<Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, borderRadius: 2, boxShadow: '1px 1px 10px gray', p: 4 }}>
 					<SvgIcon inheritViewBox component={Logo} sx={{ fontSize: 100 }}/>
 					<Typography variant='h6' align='center'>Decent Messenger</Typography>
 					<TextField fullWidth onChange={e => setRegisteringUsername(e.target.value)} size='small' label='Username' variant='outlined'/>

@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useRef, useEffect } from 'react';
 import { Box, Avatar, Divider, Typography, TextField, IconButton, List, ListItem, ListItemText } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import Message from '../models/Message';
@@ -18,6 +18,25 @@ const ChatPanel = () => {
         // console.log('Send Message:', typedMessage);
 
         // Handle Sending Message Here
+
+        // Construct message object
+        const message: Message = {
+            content: typedMessage,
+            status: MessageStatus.Pending,
+            timestamp: {
+                pending: new Date(),
+                sent: new Date()
+            },
+            sender_username: state.user.username,
+            receiver_username: state.currentChatUser.username
+        }
+
+        dispatch({
+			type: 'UpdateMessages',
+			payload: [message]
+		});
+
+        setTypedMessage('');
     }
 
     if(Object.keys(state.currentChatUser).length === 0) {
@@ -40,7 +59,7 @@ const ChatPanel = () => {
                 <Divider />
     
                 {/* ChatPanel Messages */}
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, flexGrow: 1, overflow: 'auto', p: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexGrow: 1, overflow: 'auto', p: 2 }}>
                     {state.messages.filter(message => message.sender_username===state.currentChatUser.username || message.receiver_username===state.currentChatUser.username).map(message => (
                         <Box alignSelf={(message.sender_username===state.user.username)? 'flex-end' : 'flex-start'} bgcolor={message.sender_username===state.user.username? 'primary.main' : 'secondary.light'} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 2, m: 0.5, borderRadius: 2 }}>
                             <Box color={message.sender_username===state.user.username? 'white' : 'text.primary'}>{message.content}</Box>
@@ -64,7 +83,7 @@ const ChatPanel = () => {
     
                 {/* ChatPanel Message Input */}
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', p: 2 }}>
-                    <TextField fullWidth onChange={e => setTypedMessage(e.target.value)} size='small' label='Type a Message' variant='outlined' />
+                    <TextField fullWidth value={typedMessage} onChange={e => setTypedMessage(e.target.value)} size='small' label='Type a Message' variant='outlined' />
                     <IconButton onClick={onSendMessageButtonClick}>
                         <SendIcon />
                     </IconButton>
