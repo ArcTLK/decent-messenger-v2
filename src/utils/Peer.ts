@@ -53,12 +53,26 @@ export function listenForMessages(peer: Peer) {
                         });
                     }
 
-                    Database.messages.add(transformMessageBeforeStoring(data.message)).then(() => {
-                        // send acknowledgement
-                        console.log('Sending acknowledgement to ' + data.message.senderUsername);
-                        dataConnection.send({
-                            type: MessageType.Acknowledgment
-                        });
+                    // check nonce
+                    Database.messages.get({
+                        nonce: data.message.nonce,
+                        senderUsername: data.message.senderUsername
+                    }).then(msg => {
+                        if (!msg) {
+                            Database.messages.add(transformMessageBeforeStoring(data.message)).then(() => {
+                                // send acknowledgement
+                                console.log('Sending acknowledgement to ' + data.message.senderUsername);
+                                dataConnection.send({
+                                    type: MessageType.Acknowledgment
+                                });
+                            });
+                        }
+                        else {
+                            console.log('Received duplicated message for nonce ' + data.message.nonce);
+                            dataConnection.send({
+                                type: MessageType.AlreadyReceived
+                            });
+                        }
                     });
                 });
             }
@@ -92,6 +106,10 @@ export function sendMessage(message: Message): Promise<boolean> {
                 // check for acknowledgement
                 if (data.type === MessageType.Acknowledgment) {
                     console.log('Acknowledgement received from ' + message.receiverUsername);
+                    resolve(true);
+                }
+                else if (data.type === MessageType.AlreadyReceived) {
+                    console.log(message.receiverUsername + ' has already received the message.');
                     resolve(true);
                 }
             });            

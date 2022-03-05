@@ -10,8 +10,8 @@ class Database extends Dexie {
 
     constructor() {
         super('decent-db');
-        this.version(3).stores({
-            messages: '++id, senderUsername, receiverUsername, status',
+        this.version(4).stores({
+            messages: '++id, senderUsername, receiverUsername, status, nonce',
             contacts: '++id, username',
             app: 'type'
         });

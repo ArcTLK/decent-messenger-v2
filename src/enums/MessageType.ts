@@ -1,6 +1,7 @@
 enum MessageType {
     Text = 'Text',
-    Acknowledgment = 'Acknowledgement'
+    Acknowledgment = 'Acknowledgement',
+    AlreadyReceived = 'Already Received'
 }
 
 
