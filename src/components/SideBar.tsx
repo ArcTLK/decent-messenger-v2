@@ -56,7 +56,7 @@ const SideBar = () => {
             {/* SideBar Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: 'primary.main' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar />
+                    <Avatar src={`https://avatars.dicebear.com/api/human/${state.user.username}.svg`} />
                     <Typography variant="h6" sx={{ color: 'white' }}>{state.user.name}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'end', alignItems: 'center' }}>
@@ -99,7 +99,7 @@ const SideBar = () => {
                 {contacts && contacts.filter(contact => contact.name.toLowerCase().includes(searchUser.toLowerCase())).map(contact => (
                     <ListItemButton key={contact.username} selected={Object.keys(state.currentChatUser).length !== 0 && state.currentChatUser.username === contact.username} onClick={() => setCurrentChatUser(contact)}>
                         <ListItemAvatar>
-                            <Avatar alt={contact.name} />
+                            <Avatar src={`https://avatars.dicebear.com/api/human/${contact.username}.svg`} alt={contact.name} />
                         </ListItemAvatar>
                         <ListItemText
                             primary={contact.name}

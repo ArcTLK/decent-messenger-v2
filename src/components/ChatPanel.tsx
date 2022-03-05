@@ -84,7 +84,7 @@ const ChatPanel = () => {
             
                 {/* ChatPanel Header */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2, bgcolor: 'primary.main' }}>
-                    <Avatar />
+                    <Avatar src={`https://avatars.dicebear.com/api/human/${state.currentChatUser.username}.svg`} />
                     <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentChatUser.name}</Typography>
                 </Box>
 
