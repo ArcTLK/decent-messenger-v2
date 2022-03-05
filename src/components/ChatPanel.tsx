@@ -19,13 +19,6 @@ const ChatPanel = () => {
 
     const messagesEndRef = useRef<null | HTMLElement>(null);
 
-    useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-        }
-
-    }, [state.currentChatUser]);
-
     const messages = useLiveQuery(async () => {
         return await Database
             .messages
@@ -33,9 +26,15 @@ const ChatPanel = () => {
             .equals(state.currentChatUser.username ?? '')
             .or('senderUsername')
             .equals(state.currentChatUser.username ?? '')
-            .toArray();
+            .sortBy('timestamp.pending');
     }, [state.currentChatUser]);
 
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+
+    }, [state.currentChatUser, messages]);
 
     const onSendMessageButtonClick = async () => {
         // console.log('Send Message:', typedMessage);
@@ -98,7 +97,7 @@ const ChatPanel = () => {
                             <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.content}</Box>
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'end', alignItems: 'center'}}>
                                 <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
-                                    {message.timestamp.sent.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    {message.timestamp.pending.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </Box>
                                 <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'}>
                                 {
