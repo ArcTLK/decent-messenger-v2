@@ -6,7 +6,7 @@ import Contact from './models/Contact';
 import Message from './models/Message';
 import MessageStatus from './enums/MessageStatus';
 import { ApiClient } from './utils/ApiClient';
-import { connectToPeerServer, listenForMessages, sendMessageToUser, updatePeerIdInPeerServer } from './utils/Peer';
+import { connectToPeerServer, listenForMessages } from './utils/Peer';
 import { Globals } from './Constants';
 import { Box, Typography, TextField, Divider, Button, SvgIcon, Dialog, DialogContent, DialogContentText } from '@mui/material';
 import SideBar from './components/SideBar';
@@ -41,29 +41,21 @@ function App() {
 
 	useEffect(() => {
 		// check if user object exists
-		Database.app.get<User>('user').then(user => {
-			dispatch({
-				type: 'UpdateUser',
-				payload: user
-			});
+		Database.app.get('user').then(data => {
+			if (data) {
+				const user = JSON.parse(data.payload);
 
-			const peer = connectToPeerServer(Globals.api.host, Globals.api.port, user);
-			listenForMessages(peer);
-		}).catch(error => {
-			if (error.status === 404) {
-				console.log('No User data exists in local DB.');
+				dispatch({
+					type: 'UpdateUser',
+					payload: user
+				});
+	
+				const peer = connectToPeerServer(Globals.api.host, Globals.api.port, user);
+				listenForMessages(peer);
 			}
 			else {
-				throw error;
+				console.log('No User data exists in local DB.');
 			}
-		});
-
-		// load contacts
-		Database.contacts.allDocs({ include_docs: true }).then(docs => {
-			dispatch({
-				type: 'UpdateContactList',
-				payload: docs.rows.map(x => x.doc)
-			});
 		});
 	}, []);
 
@@ -79,9 +71,9 @@ function App() {
 				payload: data
 			});
 
-			Database.app.put<User>({
-				...data,
-				_id: 'user'
+			Database.app.add({
+				type: 'user',
+				payload: JSON.stringify(data)
 			});
 
 			const peer = connectToPeerServer(Globals.api.host, Globals.api.port, data);

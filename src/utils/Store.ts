@@ -13,9 +13,7 @@ interface ContextStore {
 
 export let initialState: ContextModel = {
     user: {} as User,
-    currentChatUser: {} as Contact,
-    contactList: [] as Contact[],
-    messages: [] as Message[]
+    currentChatUser: {} as Contact
 };
 
 export const Context = createContext<ContextStore>({

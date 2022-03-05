@@ -1,6 +1,7 @@
 enum MessageStatus {
     Pending = 'Pending',
-    Sent = 'Sent'
+    Sent = 'Sent',
+    Failed = 'Failed'
 }
 
 

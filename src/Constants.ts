@@ -9,5 +9,6 @@ export const Globals = {
         }
     },
     messageRetryInterval: 3000,
-    maxPeerConnections: 50
+    maxPeerConnections: 50,
+    maxRetries: 3
 }

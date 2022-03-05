@@ -1,8 +1,11 @@
 import Peer, { DataConnection } from 'peerjs';
 import { Globals } from "../Constants";
+import MessageType from '../enums/MessageType';
+import Message from '../models/Message';
 import PeerData from '../models/PeerData';
 import User from '../models/User';
 import { ApiClient } from './ApiClient';
+import Database from './Database';
 
 export function connectToPeerServer(host: string, port: number, updatePeerServerWithConfig?: User): Peer {
     const peer = new Peer({
@@ -30,6 +33,27 @@ export function listenForMessages(peer: Peer) {
         console.log('Client is now listening for messages.');
         dataConnection.on('data', data => {
             console.log(data);
+            if (data.type === MessageType.Text) {
+                // check if contact exists
+                Database.contacts.get({
+                    username: data.message.senderUsername
+                }).then(contact => {
+                    if (contact) {
+                        Database.messages.add(data.message);
+                    }
+                    else {
+                        // create a contact then add message
+                        getPeerDataFromUsername(data.message.senderUsername).then(peerData => {                
+                            Database.contacts.add({
+                                name: peerData.name,
+                                username: data.message.senderUsername
+                            }).then(() => {
+                                Database.messages.add(data.message);
+                            });
+                        });
+                    }
+                });
+            }            
         })
     });
 }
@@ -46,18 +70,17 @@ export function getPeerDataFromUsername(username: string): Promise<PeerData> {
     return ApiClient.get(`users/${username}`).then(response => response.data);
 }
 
-export function sendMessageToUser(username: string, message: string): Promise<boolean> {
+export function sendMessage(message: Message): Promise<boolean> {
     return new Promise<boolean>(async (resolve, reject) => {
         try {
-            console.log('Trying to send a message to ' + username);
-    
-            const connection = await peerBank.getDataConnectionForUsername(username);
+            const connection = await peerBank.getDataConnectionForUsername(message.receiverUsername);
             
             connection.send({
-                message
+                message,
+                type: MessageType.Text
             });
 
-            console.log('Sent message to ' + username);
+            console.log('Sent message to ' + message.receiverUsername);
             resolve(true);
         }
         catch (e: any) {

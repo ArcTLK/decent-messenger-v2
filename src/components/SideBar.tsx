@@ -7,13 +7,20 @@ import { Box, TextField, Avatar, IconButton, Divider, List, ListItemButton, List
 import Contact from '../models/Contact';
 import { Context } from '../utils/Store';
 import { DeleteForever } from '@mui/icons-material';
-import Database, { eraseDatabase } from '../utils/Database';
+import Database from '../utils/Database';
 import { getPeerDataFromUsername, peerBank } from '../utils/Peer';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 const SideBar = () => {
     const {state, dispatch} = useContext(Context);
 
     const [searchUser, setSearchUser] = useState('');
+
+    const contacts = useLiveQuery(async () => {
+        return await Database
+            .contacts
+            .toArray();
+    }, []);
 
     const onAddContactButtonClick = () => {
         // Handle Add Contact Here
@@ -22,16 +29,10 @@ const SideBar = () => {
             // create contact object
             const contact: Contact = {
                 name: peerData.name,
-                username: searchUser,
-                _id: searchUser
+                username: searchUser
             };
 
-            dispatch({
-                type: 'UpdateContactList',
-                payload: [contact]
-            });
-
-            Database.contacts.put<Contact>(contact);                
+            Database.contacts.add(contact);              
             setSearchUser('');
         }).catch(error => {
             alert(error);
@@ -71,7 +72,7 @@ const SideBar = () => {
                     {/* For Debugging */}
                     <IconButton onClick={() => {
                         console.log('Database erased');
-                        eraseDatabase();
+                        Database.erase();
                         dispatch({
                             type: 'RevertState'
                         });
@@ -95,7 +96,7 @@ const SideBar = () => {
 
             {/* RecentChatUsers */}
             <List sx={{ overflow: "auto" }}>
-                {state.contactList.filter(contact => contact.name.toLowerCase().includes(searchUser.toLowerCase())).map(contact => (
+                {contacts && contacts.filter(contact => contact.name.toLowerCase().includes(searchUser.toLowerCase())).map(contact => (
                     <ListItemButton key={contact.username} selected={Object.keys(state.currentChatUser).length !== 0 && state.currentChatUser.username === contact.username} onClick={() => setCurrentChatUser(contact)}>
                         <ListItemAvatar>
                             <Avatar alt={contact.name} />
