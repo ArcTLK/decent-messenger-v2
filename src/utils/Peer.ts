@@ -28,6 +28,12 @@ export function connectToPeerServer(host: string, port: number, updatePeerServer
     return peer;
 }
 
+function transformMessageBeforeStoring(message: Message) {
+    delete message.id;
+    message.timestamp.pending = new Date(message.timestamp.pending);
+    return message;
+}
+
 export function listenForMessages(peer: Peer) {
     peer.on('connection', dataConnection => {
         console.log('Client is now listening for messages.');
@@ -39,8 +45,7 @@ export function listenForMessages(peer: Peer) {
                     username: data.message.senderUsername
                 }).then(contact => {
                     if (contact) {
-                        delete data.message.id;
-                        Database.messages.add(data.message);
+                        Database.messages.add(transformMessageBeforeStoring(data.message));
                     }
                     else {
                         // create a contact then add message
@@ -49,8 +54,7 @@ export function listenForMessages(peer: Peer) {
                                 name: peerData.name,
                                 username: data.message.senderUsername
                             }).then(() => {
-                                delete data.message.id;
-                                Database.messages.add(data.message);
+                                Database.messages.add(transformMessageBeforeStoring(data.message));
                             });
                         });
                     }
