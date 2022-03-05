@@ -40,7 +40,6 @@ export default class MessageQueue {
                     if (item.retries <= Globals.maxRetries) {
                         console.log(`Trying to send a message to ${item.receiverUsername} (${item.retries})`);
                         sendMessage(item).then(() => {
-                            console.log(`Message "${item.content}" marked as Sent`);
                             item.status = MessageStatus.Sent;
     
                             // update db and remove from queue
@@ -48,9 +47,9 @@ export default class MessageQueue {
                                 status: MessageStatus.Sent
                             });
                             this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
+                        }).catch(error => {
+                            console.error(error);
                         });
-    
-                        // TODO: check for acknowledgment and other stuff
                     }
                     else {
                         // update db and remove from queue

@@ -38,26 +38,28 @@ export function listenForMessages(peer: Peer) {
     peer.on('connection', dataConnection => {
         console.log('Client is now listening for messages.');
         dataConnection.on('data', data => {
-            console.log(data);
             if (data.type === MessageType.Text) {
                 // check if contact exists
                 Database.contacts.get({
                     username: data.message.senderUsername
                 }).then(contact => {
-                    if (contact) {
-                        Database.messages.add(transformMessageBeforeStoring(data.message));
-                    }
-                    else {
+                    if (!contact) {
                         // create a contact then add message
                         getPeerDataFromUsername(data.message.senderUsername).then(peerData => {                
                             Database.contacts.add({
                                 name: peerData.name,
                                 username: data.message.senderUsername
-                            }).then(() => {
-                                Database.messages.add(transformMessageBeforeStoring(data.message));
                             });
                         });
                     }
+
+                    Database.messages.add(transformMessageBeforeStoring(data.message)).then(() => {
+                        // send acknowledgement
+                        console.log('Sending acknowledgement to ' + data.message.senderUsername);
+                        dataConnection.send({
+                            type: MessageType.Acknowledgment
+                        });
+                    });
                 });
             }
         })
@@ -86,8 +88,16 @@ export function sendMessage(message: Message): Promise<boolean> {
                 type: MessageType.Text
             });
 
-            console.log('Sent message to ' + message.receiverUsername);
-            resolve(true);
+            connection.on('data', data => {
+                // check for acknowledgement
+                if (data.type === MessageType.Acknowledgment) {
+                    console.log('Acknowledgement received from ' + message.receiverUsername);
+                    resolve(true);
+                }
+            });            
+
+            // message timeout
+            setTimeout(() => reject('Message Timed Out'), Globals.messageTimeoutDuration);
         }
         catch (e: any) {
             reject(false);
