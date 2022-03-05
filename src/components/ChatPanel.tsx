@@ -99,13 +99,13 @@ const ChatPanel = () => {
                                 <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
                                     {message.timestamp.pending.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </Box>
-                                <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'}>
+                                {message.senderUsername===state.user.username && <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'}>
                                 {
                                     (message.status===MessageStatus.Pending && <AccessTimeIcon sx={{ fontSize: 16 }}/>) ||
                                     (message.status===MessageStatus.Sent && <DoneIcon sx={{ fontSize: 16 }}/>) ||
                                     (<DoneAllIcon sx={{ fontSize: 16 }}/>)
                                 }
-                                </Box>
+                                </Box>}
                             </Box>
                         </Box>
                     ))}
