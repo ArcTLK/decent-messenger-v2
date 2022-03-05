@@ -41,7 +41,7 @@ function App() {
 
 	useEffect(() => {
 		// check if user object exists
-		/*Database.app.get<User>('user').then(user => {
+		Database.app.get<User>('user').then(user => {
 			dispatch({
 				type: 'UpdateUser',
 				payload: user
@@ -51,42 +51,37 @@ function App() {
 			listenForMessages(peer);
 		}).catch(error => {
 			if (error.status === 404) {
-				// create user
-				console.log('Creating User');
-
-				ApiClient.post('users', {
-					name: 'Tester',
-					username: prompt('Enter Username')
-				}).then(({ data }) => {
-					dispatch({
-						type: 'UpdateUser',
-						payload: data
-					});
-
-					Database.app.put<User>({
-						...data,
-						_id: 'user'
-					});
-
-					const peer = connectToPeerServer(Globals.api.host, Globals.api.port, data);
-					listenForMessages(peer);
-				});
+				console.log('No User data exists in local DB.');
 			}
 			else {
 				throw error;
 			}
-		});*/
+		});
 	}, []);
 
 	const onSubmitRegistrationForm = () => {
-		const userData = {
-			username: registeringUsername,
-			name: registeringName,
-			server: "",
-			deviceKey: "",
-			peerId: ""
-		} as User;
+		console.log('Creating User');
 
+		ApiClient.post('users', {
+			name: registeringName,
+			username: registeringUsername
+		}).then(({ data }) => {
+			dispatch({
+				type: 'UpdateUser',
+				payload: data
+			});
+
+			Database.app.put<User>({
+				...data,
+				_id: 'user'
+			});
+
+			const peer = connectToPeerServer(Globals.api.host, Globals.api.port, data);
+			listenForMessages(peer);
+		});		
+	};
+
+	useEffect(() => {
 		// <DummyData>
 		const contactList: Contact[] = [];
 		for (let i = 0; i < 20; i++) {
@@ -118,7 +113,7 @@ function App() {
 			const receiver = sender===registeringUsername? `john_doe${(Math.round(Math.random()*20)+1).toString()}` : registeringUsername;
 			messages.push({
 				content: randomText(Math.ceil(Math.random()*30)),
-				status: MessageStatus.Acknowledged,
+				status: MessageStatus.Sent,
 				timestamp: {
 					pending: new Date(),
 					sent: new Date()
@@ -128,12 +123,6 @@ function App() {
 			} as Message)
 		}
 		// </DummyData>
-
-		dispatch({
-			type: 'UpdateUser',
-			payload: userData
-		});
-
 		dispatch({
 			type: 'UpdateContactList',
 			payload: contactList
@@ -143,7 +132,7 @@ function App() {
 			type: 'UpdateMessages',
 			payload: messages
 		});
-	};
+	}, []);
 
 	if(Object.keys(state.user).length === 0) {
 		return (

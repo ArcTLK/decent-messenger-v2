@@ -6,4 +6,10 @@ const Database = {
     app: new PouchDb('app')
 }
 
+export function eraseDatabase() {
+    Database.messages.destroy();
+    Database.contacts.destroy();
+    Database.app.destroy();
+}
+
 export default Database;

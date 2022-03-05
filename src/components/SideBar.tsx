@@ -6,6 +6,8 @@ import BugReportIcon from '@mui/icons-material/BugReport';
 import { Box, TextField, Avatar, IconButton, Divider, List, ListItemButton, ListItemAvatar, ListItemText, Typography } from '@mui/material';
 import Contact from '../models/Contact';
 import { Context } from '../utils/Store';
+import { DeleteForever } from '@mui/icons-material';
+import { eraseDatabase } from '../utils/Database';
 
 const SideBar = () => {
     const {state, dispatch} = useContext(Context);
@@ -44,6 +46,17 @@ const SideBar = () => {
                     {/* For Debugging */}
                     <IconButton onClick={() => console.log(state)} sx={{ color: 'white' }}>
                         <BugReportIcon />
+                    </IconButton>
+
+                    {/* For Debugging */}
+                    <IconButton onClick={() => {
+                        console.log('Database erased');
+                        eraseDatabase();
+                        dispatch({
+                            type: 'RevertState'
+                        });
+                    }} sx={{ color: 'white' }}>
+                        <DeleteForever />
                     </IconButton>
                 </Box>
             </Box>

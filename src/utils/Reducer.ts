@@ -1,5 +1,6 @@
 import Action from "../models/Action";
 import ContextModel from "../models/ContextModel";
+import { initialState } from "./Store";
 
 const updateState = (state: ContextModel, newState: Partial<ContextModel>): ContextModel => {
     const updatedState = {
@@ -20,6 +21,8 @@ const Reducer = (state: ContextModel, action: Action): ContextModel => {
             return updateState(state, { contactList: [ ...state.contactList, ...action.payload ] });
         case 'UpdateMessages':
             return updateState(state, { messages: [ ...state.messages, ...action.payload ] });
+        case 'RevertState':
+            return initialState;
         default:
             return state;
     }

@@ -5,7 +5,8 @@ export default interface Message {
     status: MessageStatus;
     timestamp: {
         pending: Date,
-        sent: Date
+        sent: Date,
+        retry?: Date
     };
     sender_username: string;
     receiver_username: string;

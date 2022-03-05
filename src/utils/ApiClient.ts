@@ -8,12 +8,12 @@ export const ApiClient = axios.create({
 ApiClient.interceptors.response.use(response => response, error => {
     if (error.response && error.response.data) {
         console.error(error.response.data.error);
+        throw new Error(error.response.data.error);
     }
     else {
         console.error(error);
+        throw error;
     }
-
-    throw error;
 });
 
 export function doUrlEncodedRequest(method: string, params: any, url: string) {

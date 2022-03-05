@@ -7,5 +7,7 @@ export const Globals = {
             peerjs: '/peerjs',
             app: '/api'
         }
-    }
+    },
+    messageRetryInterval: 3000,
+    maxPeerConnections: 50
 }

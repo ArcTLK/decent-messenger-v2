@@ -68,8 +68,8 @@ const ChatPanel = () => {
     
                 {/* ChatPanel Messages */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexGrow: 1, overflow: 'auto', p: 2 }}>
-                    {state.messages.filter(message => message.sender_username===state.currentChatUser.username || message.receiver_username===state.currentChatUser.username).map(message => (
-                        <Box alignSelf={(message.sender_username===state.user.username)? 'flex-end' : 'flex-start'} bgcolor={message.sender_username===state.user.username? 'primary.main' : 'secondary.light'} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 2, m: 0.5, borderRadius: 2 }}>
+                    {state.messages.filter(message => message.sender_username===state.currentChatUser.username || message.receiver_username===state.currentChatUser.username).map((message, index) => (
+                        <Box key={index} alignSelf={(message.sender_username===state.user.username)? 'flex-end' : 'flex-start'} bgcolor={message.sender_username===state.user.username? 'primary.main' : 'secondary.light'} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 2, m: 0.5, borderRadius: 2 }}>
                             <Box color={message.sender_username===state.user.username? 'white' : 'text.primary'}>{message.content}</Box>
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'end', alignItems: 'center'}}>
                                 <Box color={message.sender_username===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
