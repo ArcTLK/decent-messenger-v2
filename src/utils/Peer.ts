@@ -42,49 +42,47 @@ export function updatePeerIdInPeerServer(username: string, deviceKey: string, pe
     });
 }
 
-function getPeerDataFromUsername(username: string): Promise<PeerData> {
+export function getPeerDataFromUsername(username: string): Promise<PeerData> {
     return ApiClient.get(`users/${username}`).then(response => response.data);
 }
 
-function sendMessageToPeer(peerId: string) {
+export function sendMessageToUser(username: string, message: string): Promise<boolean> {
+    return new Promise<boolean>(async (resolve, reject) => {
+        try {
+            console.log('Trying to send a message to ' + username);
     
-}
-
-export async function sendMessageToUser(username: string, message: string) {
-    try {
-        console.log('Trying to send a message to ' + username);
-
-        const connection = await peerBank.getDataConnectionForUsername(username);
-        
-        connection.on('open', () => {
+            const connection = await peerBank.getDataConnectionForUsername(username);
+            
             connection.send({
                 message
             });
 
             console.log('Sent message to ' + username);
-        }); 
-    }
-    catch (e: any) {
-        throw new Error(e.response.data.error);
-    }
+            resolve(true);
+        }
+        catch (e: any) {
+            reject(false);
+            throw new Error(e.response.data.error);
+        }
+    });
 }
 
 class PeerBank {
     peers: {
         [username: string]: {
-            connection: DataConnection,
+            connection?: DataConnection,
             inUse: number,
             lastUsed: Date,
-            peer: Peer
+            myPeer: Peer,
+            peerId: string
         }
     } = {};
+    peerCount: number = 0;
 
-    getDataConnectionForUsername(username: string): Promise<DataConnection> {
-        return new Promise<DataConnection>(async (resolve, reject) => {
+    createPeerServerConnectionForUsername(username: string): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             if (this.peers[username]) {
-                this.peers[username].lastUsed = new Date();
-                ++this.peers[username].inUse;
-                resolve(this.peers[username].connection);
+                resolve();
             }
             else {
                 // peer connection not found
@@ -94,15 +92,15 @@ class PeerBank {
                     
                     // Step 2: Connect to peer server
                     const [host, port] = peerData.server.split(':');
-                    const peer = connectToPeerServer(host, parseInt(port));
+                    const peer = connectToPeerServer(host, parseInt(port));                    
                     
                     peer.on('error', error => {
-                        console.error(error);
+                        console.error(`Closing peer for user ${username} [${error.type}]: (${error.message})`);
                         this.removePeer(username);
                         reject(error.type);
                     });
                     peer.on('close', () => {
-                        console.log('Closing peer for user ' + username + ' (Unknown reason)');
+                        console.log('Closing peer for user ' + username + ' (Close Event called)');
                         this.removePeer(username);
                     });
                     peer.on('disconnected', () => {
@@ -110,38 +108,81 @@ class PeerBank {
                         this.removePeer(username);
                     });
 
-                    const dataConnection = peer.connect(peerData.peerId);                
-                    dataConnection.on('open', () => {                        
-                        console.log('Connected to ' + username + ' on a data channel.');
+                    peer.on('open', () => {
                         // remove least recently used peer
-                        this.removeLRU();
-                        this.peers[username] = {
-                            connection: dataConnection,
-                            lastUsed: new Date(),
-                            inUse: 1,
-                            peer: peer
+                        if (this.peerCount > Globals.maxPeerConnections) {
+                            this.removeLRU();
                         }
-                        resolve(dataConnection);
+
+                        this.peers[username] = {
+                            lastUsed: new Date(),
+                            inUse: 0,
+                            myPeer: peer,
+                            peerId: peerData.peerId
+                        }
+                        ++this.peerCount;
+                        resolve();
                     });
-
-
                 }                
                 catch (e: any) {
                     reject(e.message);
                 }
             }
+        });
+    }
+
+    getDataConnectionForUsername(username: string): Promise<DataConnection> {
+        return new Promise<DataConnection>(async (resolve, reject) => {
+            if (this.peers[username]) {
+                if (this.peers[username].connection) {
+                    this.peers[username].lastUsed = new Date();
+                    ++this.peers[username].inUse;
+                    resolve(this.peers[username].connection!);
+                }
+                else {
+                    // create a data connection
+                    this.createDataConnection(this.peers[username].myPeer, username).then(connection => {
+                        resolve(connection);
+                    });
+                }
+            }
+            else {
+                this.createPeerServerConnectionForUsername(username).then(() => {
+                    // create a data connection
+                    this.createDataConnection(this.peers[username].myPeer, username).then(connection => {
+                        resolve(connection);
+                    });
+                });
+            }
         });        
+    }
+
+    createDataConnection(peer: Peer, username: string) {
+        return new Promise<DataConnection>((resolve, reject) => {
+            const dataConnection = peer.connect(this.peers[username].peerId);                
+            dataConnection.on('open', () => { 
+                console.log('Connected to ' + username + ' on a data channel.');
+                this.peers[username].connection = dataConnection;
+                this.peers[username].lastUsed = new Date();
+                this.peers[username].inUse = 1;
+                resolve(dataConnection);
+            });
+        });
     }
     
     // can be used to remove peers in case a peer is offline / inactive
     removePeer(username: string) {
-        if (!this.peers[username].inUse) {
-            this.peers[username].peer.destroy();
-            delete this.peers[username];
+        // console.log('Removing peer for username ' + username);
+        if (this.peers[username]) {
+            if (!this.peers[username].inUse) {
+                this.peers[username].myPeer.destroy();
+                delete this.peers[username];
+                --this.peerCount;
+            }   
+            else {
+                throw new Error(`Peer ${this.peers[username].myPeer.id} of user ${username} is currently in use and was asked to be deleted.`);
+            }
         }   
-        else {
-            throw new Error(`Peer ${this.peers[username].peer.id} of user ${username} is currently in use and was asked to be deleted.`);
-        }     
     }
 
     removeLRU() {
@@ -156,8 +197,7 @@ class PeerBank {
 
         if (LRU) {
             console.log('Closing connection with user ' + LRU + ' due to LRU policy.');
-            this.peers[LRU].peer.destroy();
-            delete this.peers[LRU];
+            this.removePeer(LRU);
         }
     }
 

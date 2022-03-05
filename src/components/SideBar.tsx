@@ -7,7 +7,8 @@ import { Box, TextField, Avatar, IconButton, Divider, List, ListItemButton, List
 import Contact from '../models/Contact';
 import { Context } from '../utils/Store';
 import { DeleteForever } from '@mui/icons-material';
-import { eraseDatabase } from '../utils/Database';
+import Database, { eraseDatabase } from '../utils/Database';
+import { getPeerDataFromUsername, peerBank } from '../utils/Peer';
 
 const SideBar = () => {
     const {state, dispatch} = useContext(Context);
@@ -16,6 +17,25 @@ const SideBar = () => {
 
     const onAddContactButtonClick = () => {
         // Handle Add Contact Here
+        getPeerDataFromUsername(searchUser).then(peerData => {
+            console.log('Found user ' + searchUser);
+            // create contact object
+            const contact: Contact = {
+                name: peerData.name,
+                username: searchUser,
+                _id: searchUser
+            };
+
+            dispatch({
+                type: 'UpdateContactList',
+                payload: [contact]
+            });
+
+            Database.contacts.put<Contact>(contact);                
+            setSearchUser('');
+        }).catch(error => {
+            alert(error);
+        });
     };
 
     const onSettingsButtonClick = () => {

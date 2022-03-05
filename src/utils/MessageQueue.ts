@@ -10,7 +10,7 @@ export default class MessageQueue {
         setInterval(() => {
             if (this.messages.length > 0) {
                 // retry sending messages
-                this.retrySendingMessages();
+                // this.retrySendingMessages();
             }
         }, Globals.messageRetryInterval);
     }
@@ -22,11 +22,24 @@ export default class MessageQueue {
             // check state
             if (item.status === MessageStatus.Pending) {
                 if (!item.timestamp.retry || (now - item.timestamp.retry.getTime() >= Globals.messageRetryInterval)) {
-                    sendMessageToUser(item.receiver_username, item.content);
+                    sendMessageToUser(item.receiver_username, item.content).then(() => {
+                        console.log(`Message "${item.content}" marked as Sent`);
+                        item.status = MessageStatus.Sent;
+
+                        // remove message from queue
+                    });
 
                     // check for acknowledgment and other stuff
                 }
             }
         });
     }
+
+    addMessage(message: Message) {
+        console.log('Added message "' + message.content + '" to queue');
+        this.messages.push(message);
+        this.retrySendingMessages();
+    }
 }
+
+export const messageQueue = new MessageQueue();

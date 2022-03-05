@@ -7,6 +7,7 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MessageStatus from '../enums/MessageStatus';
 import { Context } from '../utils/Store';
+import { messageQueue } from '../utils/MessageQueue';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -38,6 +39,8 @@ const ChatPanel = () => {
             sender_username: state.user.username,
             receiver_username: state.currentChatUser.username
         }
+
+        messageQueue.addMessage(message);
 
         dispatch({
 			type: 'UpdateMessages',
