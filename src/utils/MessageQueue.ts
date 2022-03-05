@@ -32,7 +32,7 @@ export default class MessageQueue {
             if (item.status === MessageStatus.Pending) {
                 if ((!item.timestamp.retry || (now - item.timestamp.retry.getTime() >= Globals.messageRetryInterval))) {
                     if (!item.retries) {
-                        item.retries = 0;
+                        item.retries = 1;
                     }
                     else {
                         ++item.retries;
