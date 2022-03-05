@@ -74,6 +74,10 @@ const ChatPanel = () => {
     const retrySendingMessage = (message: Message) => {
         console.log('Retrying: ', message);
         delete message.retries;
+        message.status = MessageStatus.Pending;
+        Database.messages.update(message.id!, {
+            status: MessageStatus.Pending
+        });
         messageQueue.addMessage(message);
     };
 
@@ -109,7 +113,7 @@ const ChatPanel = () => {
                                 {
                                     (message.status===MessageStatus.Pending && <AccessTimeIcon sx={{ fontSize: 16 }}/>) ||
                                     (message.status===MessageStatus.Sent && <DoneIcon sx={{ fontSize: 16 }}/>) ||
-                                    (message.status===MessageStatus.Failed && <Button variant="text" onClick={() => retrySendingMessage(message)} sx={{ color: '#d1c4e9' }}>Retry</Button>) ||
+                                    (message.status===MessageStatus.Failed && <Button size='small' variant="text" onClick={() => retrySendingMessage(message)} sx={{ color: '#d1c4e9' }}>Retry</Button>) ||
                                     (<DoneAllIcon sx={{ fontSize: 16 }}/>)
                                 }
                                 </Box>}
