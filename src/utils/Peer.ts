@@ -39,6 +39,7 @@ export function listenForMessages(peer: Peer) {
                     username: data.message.senderUsername
                 }).then(contact => {
                     if (contact) {
+                        delete data.message.id;
                         Database.messages.add(data.message);
                     }
                     else {
@@ -48,6 +49,7 @@ export function listenForMessages(peer: Peer) {
                                 name: peerData.name,
                                 username: data.message.senderUsername
                             }).then(() => {
+                                delete data.message.id;
                                 Database.messages.add(data.message);
                             });
                         });
