@@ -1,6 +1,6 @@
 import { useState, useContext, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Box, Avatar, Divider, Typography, TextField, IconButton, List, ListItem, ListItemText } from '@mui/material';
+import { Button, Box, Avatar, Divider, Typography, TextField, IconButton, List, ListItem, ListItemText } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import Message from '../models/Message';
 import DoneIcon from '@mui/icons-material/Done';
@@ -71,6 +71,12 @@ const ChatPanel = () => {
         setTypedMessage('');
     }
 
+    const retrySendingMessage = (message: Message) => {
+        console.log('Retrying: ', message);
+        delete message.retries;
+        messageQueue.addMessage(message);
+    };
+
     if(Object.keys(state.currentChatUser).length === 0) {
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flexGrow: 3 }}>
@@ -103,6 +109,7 @@ const ChatPanel = () => {
                                 {
                                     (message.status===MessageStatus.Pending && <AccessTimeIcon sx={{ fontSize: 16 }}/>) ||
                                     (message.status===MessageStatus.Sent && <DoneIcon sx={{ fontSize: 16 }}/>) ||
+                                    (message.status===MessageStatus.Failed && <Button variant="text" onClick={() => retrySendingMessage(message)} sx={{ color: '#d1c4e9' }}>Retry</Button>) ||
                                     (<DoneAllIcon sx={{ fontSize: 16 }}/>)
                                 }
                                 </Box>}

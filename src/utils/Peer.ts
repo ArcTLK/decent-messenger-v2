@@ -59,7 +59,7 @@ export function listenForMessages(peer: Peer) {
                         });
                     }
                 });
-            }            
+            }
         })
     });
 }
