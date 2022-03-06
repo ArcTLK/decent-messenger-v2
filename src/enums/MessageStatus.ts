@@ -1,5 +1,5 @@
 enum MessageStatus {
-    Pending = 'Pending',
+    Queued = 'Queued',
     Sent = 'Sent',
     Failed = 'Failed'
 }

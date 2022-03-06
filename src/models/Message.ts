@@ -8,14 +8,12 @@ export default interface Message {
     senderUsername: string;
     receiverUsername: string;
     nonce: string;
-    serial: number;
+    createdAt: Date;
+
 
     // and not these
-    timestamp: {
-        pending: Date,
-        sent: Date,
-        retry?: Date
-    };
+    sentAt?: Date;
+    retriedAt?: Date;
     retries?: number;
     id?: IndexableType;
 }

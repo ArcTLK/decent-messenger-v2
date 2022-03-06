@@ -26,7 +26,7 @@ const ChatPanel = () => {
             .equals(state.currentChatUser.username ?? '')
             .or('senderUsername')
             .equals(state.currentChatUser.username ?? '')
-            .sortBy('timestamp.pending');
+            .sortBy('createdAt');
     }, [state.currentChatUser]);
 
     useEffect(() => {
@@ -41,23 +41,19 @@ const ChatPanel = () => {
 
         // Handle Sending Message Here
 
-        // calculate serial
-        const previousMessages = await Database.messages.where('receiverUsername').equals(state.currentChatUser.username).sortBy('serial');
-        const previousMessage = previousMessages.pop();
-        const serial = previousMessage ? previousMessage.serial + 1 : 0;
+        // calculate serial - not required (using createdAt instead)
+        // const previousMessages = await Database.messages.where('receiverUsername').equals(state.currentChatUser.username).sortBy('serial');
+        // const previousMessage = previousMessages.pop();
+        // const serial = previousMessage ? previousMessage.serial + 1 : 0;
 
         // Construct message object
         const message: Message = {
             content: typedMessage,
-            status: MessageStatus.Pending,
-            timestamp: {
-                pending: new Date(),
-                sent: new Date()
-            },
+            status: MessageStatus.Queued,
+            createdAt: new Date(),
             senderUsername: state.user.username,
             receiverUsername: state.currentChatUser.username,
-            nonce: uuidv4(),
-            serial
+            nonce: uuidv4()
         }
 
         // add to DB
@@ -74,9 +70,9 @@ const ChatPanel = () => {
     const retrySendingMessage = (message: Message) => {
         console.log('Retrying: ', message);
         delete message.retries;
-        message.status = MessageStatus.Pending;
+        message.status = MessageStatus.Queued;
         Database.messages.update(message.id!, {
-            status: MessageStatus.Pending
+            status: MessageStatus.Queued
         });
         messageQueue.addMessage(message);
     };
@@ -107,11 +103,11 @@ const ChatPanel = () => {
                             <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.content}</Box>
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'end', alignItems: 'center'}}>
                                 <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
-                                    {message.timestamp.pending.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    {message.createdAt.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </Box>
                                 {message.senderUsername===state.user.username && <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'}>
                                 {
-                                    (message.status===MessageStatus.Pending && <AccessTimeIcon sx={{ fontSize: 16 }}/>) ||
+                                    (message.status===MessageStatus.Queued && <AccessTimeIcon sx={{ fontSize: 16 }}/>) ||
                                     (message.status===MessageStatus.Sent && <DoneIcon sx={{ fontSize: 16 }}/>) ||
                                     (message.status===MessageStatus.Failed && <Button size='small' variant="text" onClick={() => retrySendingMessage(message)} sx={{ color: '#d1c4e9' }}>Retry</Button>) ||
                                     (<DoneAllIcon sx={{ fontSize: 16 }}/>)

@@ -1,5 +1,6 @@
 import Peer, { DataConnection } from 'peerjs';
 import { Globals } from "../Constants";
+import ErrorType from '../enums/ErrorType';
 import MessageType from '../enums/MessageType';
 import Message from '../models/Message';
 import PeerData from '../models/PeerData';
@@ -30,8 +31,46 @@ export function connectToPeerServer(host: string, port: number, updatePeerServer
 
 function transformMessageBeforeStoring(message: Message) {
     delete message.id;
-    message.timestamp.pending = new Date(message.timestamp.pending);
+    message.createdAt = new Date(message.createdAt);
     return message;
+}
+
+export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: string): Promise<string> {
+    return new Promise<string>(async (resolve, reject) => {
+        try {
+            Database.app.get('rsa-keystore').then(async data => {
+                if (data) {
+                    const keys = JSON.parse(data.payload);
+                    const connection = await peerBank.getDataConnectionForUsername(theirUsername);
+            
+                    connection.send({
+                        publicKey: keys.publicKey,
+                        username: ourUsername,
+                        type: MessageType.KeyExchange
+                    });
+
+                    connection.on('data', data => {
+                        // listen for public key of other party
+                        if (data.type === MessageType.KeyExchangeReply) {
+                            peerBank.releaseUsage(theirUsername);
+                            resolve(data.publicKey);
+                        }
+                    });
+
+                    // message timeout
+                    setTimeout(() => reject(ErrorType.KeyExchangeTimeout), Globals.messageTimeoutDuration);
+                    
+                }
+                else {
+                    reject(ErrorType.RSAKeyStoreNotFound);
+                }
+            });            
+        }
+        catch (e: any) {
+            reject(false);
+            throw new Error(e.response.data.error);
+        }
+    });    
 }
 
 export function listenForMessages(peer: Peer) {
@@ -44,13 +83,7 @@ export function listenForMessages(peer: Peer) {
                     username: data.message.senderUsername
                 }).then(contact => {
                     if (!contact) {
-                        // create a contact then add message
-                        getPeerDataFromUsername(data.message.senderUsername).then(peerData => {                
-                            Database.contacts.add({
-                                name: peerData.name,
-                                username: data.message.senderUsername
-                            });
-                        });
+                        throw new Error(ErrorType.RSAKeyExchangeNotDone);
                     }
 
                     // check nonce
@@ -73,6 +106,30 @@ export function listenForMessages(peer: Peer) {
                                 type: MessageType.AlreadyReceived
                             });
                         }
+                    });
+                });
+            }
+            else if (data.type === MessageType.KeyExchange) {
+                // create a contact
+                getPeerDataFromUsername(data.username).then(peerData => {             
+                    Database.contacts.add({
+                        name: peerData.name,
+                        username: data.username,
+                        publicKey: data.publicKey
+                    }).then(() => {
+                        Database.app.get('rsa-keystore').then(keys => {
+                            if (keys) {
+                                const key = JSON.parse(keys.payload).publicKey;
+                                // reply with our public key
+                                dataConnection.send({
+                                    type: MessageType.KeyExchangeReply,
+                                    publicKey: key
+                                });
+                            }
+                            else {
+                                console.error(ErrorType.RSAKeyStoreNotFound);
+                            }
+                        });                        
                     });
                 });
             }
@@ -115,7 +172,7 @@ export function sendMessage(message: Message): Promise<boolean> {
             });            
 
             // message timeout
-            setTimeout(() => reject('Message Timed Out'), Globals.messageTimeoutDuration);
+            setTimeout(() => reject(ErrorType.MessageTimeout), Globals.messageTimeoutDuration);
         }
         catch (e: any) {
             reject(false);

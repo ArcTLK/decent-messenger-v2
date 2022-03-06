@@ -8,8 +8,9 @@ import Contact from '../models/Contact';
 import { Context } from '../utils/Store';
 import { DeleteForever } from '@mui/icons-material';
 import Database from '../utils/Database';
-import { getPeerDataFromUsername, peerBank } from '../utils/Peer';
+import { doRsaPublicKeyExchange, getPeerDataFromUsername, peerBank } from '../utils/Peer';
 import { useLiveQuery } from 'dexie-react-hooks';
+import ErrorType from '../enums/ErrorType';
 
 const SideBar = () => {
     const {state, dispatch} = useContext(Context);
@@ -25,15 +26,23 @@ const SideBar = () => {
     const onAddContactButtonClick = () => {
         // Handle Add Contact Here
         getPeerDataFromUsername(searchUser).then(peerData => {
-            console.log('Found user ' + searchUser);
-            // create contact object
-            const contact: Contact = {
-                name: peerData.name,
-                username: searchUser
-            };
+            console.log('Executing RSA public key exchange for user ' + searchUser);
+            doRsaPublicKeyExchange(state.user.username, searchUser).then(key => {
+                // create contact object
+                const contact: Contact = {
+                    name: peerData.name,
+                    username: searchUser,
+                    publicKey: key
+                };
 
-            Database.contacts.add(contact);              
-            setSearchUser('');
+                Database.contacts.add(contact);              
+                setSearchUser('');
+            }).catch(error => {
+                if (error === ErrorType.KeyExchangeTimeout) {
+                    alert('User is currently offline, so cannot perform RSA Key exchange!');
+                }
+                else throw new Error(error);
+            });
         }).catch(error => {
             alert(error);
         });

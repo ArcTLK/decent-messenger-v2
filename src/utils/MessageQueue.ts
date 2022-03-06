@@ -2,14 +2,14 @@ import { Globals } from "../Constants";
 import MessageStatus from "../enums/MessageStatus";
 import Message from "../models/Message";
 import Database from "./Database";
-import { sendMessage } from "./Peer";
+import { peerBank, sendMessage } from "./Peer";
 export default class MessageQueue {
     messages: Message[] = [];
 
     constructor() {
         // populate message queue from db
         Database.messages.where({
-            status: MessageStatus.Pending
+            status: MessageStatus.Queued
         }).toArray().then(messages => {
             if (messages) {
                 this.messages.push(...messages);
@@ -29,8 +29,8 @@ export default class MessageQueue {
 
         this.messages.forEach(item => {
             // check state
-            if (item.status === MessageStatus.Pending) {
-                if ((!item.timestamp.retry || (now - item.timestamp.retry.getTime() >= Globals.messageRetryInterval))) {
+            if (item.status === MessageStatus.Queued) {
+                if ((!item.retriedAt || (now - item.retriedAt.getTime() >= Globals.messageRetryInterval))) {
                     if (!item.retries) {
                         item.retries = 1;
                     }
@@ -49,6 +49,8 @@ export default class MessageQueue {
                             this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
                         }).catch(error => {
                             console.error(error);
+                        }).finally(() => {
+                            peerBank.releaseUsage(item.receiverUsername);
                         });
                     }
                     else {
@@ -60,6 +62,9 @@ export default class MessageQueue {
                         this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);                        
                     }
                 }
+            }
+            else {
+                this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
             }
         });
     }
