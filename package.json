@@ -16,6 +16,7 @@
     "@types/react": "^17.0.39",
     "@types/react-dom": "^17.0.11",
     "axios": "^0.26.0",
+    "crypto-js": "^4.1.1",
     "dexie": "^3.2.1",
     "dexie-react-hooks": "^1.1.1",
     "js-crypto-rsa": "^1.0.4",
@@ -52,6 +53,7 @@
     ]
   },
   "devDependencies": {
+    "@types/crypto-js": "^4.1.1",
     "@types/uuid": "^8.3.4",
     "react-app-rewired": "^2.2.1"
   }

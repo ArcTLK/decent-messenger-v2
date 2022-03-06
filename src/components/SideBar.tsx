@@ -42,7 +42,9 @@ const SideBar = () => {
                     alert('User is currently offline, so cannot perform RSA Key exchange!');
                 }
                 else throw new Error(error);
-            });
+            }).finally(() => {
+                peerBank.releaseUsage(searchUser);
+            })
         }).catch(error => {
             alert(error);
         });

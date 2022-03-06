@@ -1,5 +1,8 @@
 import Peer, { DataConnection } from 'peerjs';
 import rsa from 'js-crypto-rsa';
+import aes from 'crypto-js/aes';
+import utf8Encoder from 'crypto-js/enc-utf8';
+import { v4 as uuidv4 } from 'uuid';
 import { Globals } from "../Constants";
 import ErrorType from '../enums/ErrorType';
 import MessageType from '../enums/MessageType';
@@ -54,14 +57,12 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
                     connection.on('data', data => {
                         // listen for public key of other party
                         if (data.type === MessageType.KeyExchangeReply) {
-                            peerBank.releaseUsage(theirUsername);
                             resolve(data.publicKey);
                         }
                     });
 
                     // message timeout
-                    setTimeout(() => reject(ErrorType.KeyExchangeTimeout), Globals.messageTimeoutDuration);
-                    
+                    setTimeout(() => reject(ErrorType.KeyExchangeTimeout), Globals.messageTimeoutDuration);                    
                 }
                 else {
                     reject(ErrorType.RSAKeyStoreNotFound);
@@ -80,54 +81,55 @@ export function listenForMessages(peer: Peer) {
         console.log('Client is now listening for messages.');
         dataConnection.on('data', data => {
             if (data.type === MessageType.Text) {
-                // check if contact exists
-                Database.contacts.get({
-                    username: data.message.senderUsername
-                }).then(contact => {
-                    if (!contact) {
-                        throw new Error(ErrorType.RSAKeyExchangeNotDone);
-                    }
+                // decrypt message
+                decryptDataIntoObject(data.encryptedData).then((decryptedData: { message: Message, signature: Uint8Array }) => {
+                    // check if contact exists
+                    Database.contacts.get({
+                        username: decryptedData.message.senderUsername
+                    }).then(contact => {
+                        if (!contact) {
+                            throw new Error(ErrorType.RSAKeyExchangeNotDone);
+                        }
 
-                    // check nonce
-                    Database.messages.get({
-                        nonce: data.message.nonce,
-                        senderUsername: data.message.senderUsername
-                    }).then(msg => {
-                        if (!msg) {
-                            // verify signature
-                            Database.contacts.get({
-                                username: data.message.senderUsername
-                            }).then(user => {
-                                if (user) {
-                                    const message = cleanMessage(data.message);
+                        // check nonce
+                        Database.messages.get({
+                            nonce: decryptedData.message.nonce,
+                            senderUsername: decryptedData.message.senderUsername
+                        }).then(msg => {
+                            if (!msg) {
+                                // verify signature
+                                const message = cleanMessage(decryptedData.message);
 
-                                    rsa.verify(objectToUint8Array(message), data.signature, user.publicKey, 'SHA-256').then(valid => {
-                                        if (valid) {
-                                            Database.messages.add(message).then(() => {
-                                                // send acknowledgement
-                                                console.log('Sending acknowledgement to ' + data.message.senderUsername);
-                                                dataConnection.send({
-                                                    type: MessageType.Acknowledgment
-                                                });
+                                // fix signature (got messed up due to encryption)
+                                const signature = Uint8Array.from(Object.values(decryptedData.signature));
+
+                                rsa.verify(new TextEncoder().encode(JSON.stringify(message)), signature, contact.publicKey, 'SHA-256').then(valid => {
+                                    if (valid) {
+                                        Database.messages.add(message).then(() => {
+                                            // send acknowledgement
+                                            console.log('Sending acknowledgement to ' + decryptedData.message.senderUsername);
+                                            dataConnection.send({
+                                                type: MessageType.Acknowledgment
                                             });
-                                        }
-                                        else {
-                                            console.error('Digital signature verification failed!');
-                                        }                                     
-                                    });                                    
-                                }
-                                else {
-                                    throw new Error(ErrorType.ContactNotFound);
-                                }
-                            });                            
-                        }
-                        else {
-                            console.log('Received duplicated message for nonce ' + data.message.nonce);
-                            dataConnection.send({
-                                type: MessageType.AlreadyReceived
-                            });
-                        }
+                                        });
+                                    }
+                                    else {
+                                        console.error('Digital signature verification failed!');
+                                    }                                     
+                                }).catch(error => {
+                                    console.error(error);
+                                }) 
+                            }
+                            else {
+                                console.log('Received duplicated message for nonce ' + decryptedData.message.nonce);
+                                dataConnection.send({
+                                    type: MessageType.AlreadyReceived
+                                });
+                            }
+                        });
                     });
+                }).catch(error => {
+                    console.error(error);
                 });
             }
             else if (data.type === MessageType.KeyExchange) {
@@ -170,24 +172,41 @@ export function getPeerDataFromUsername(username: string): Promise<PeerData> {
     return ApiClient.get(`users/${username}`).then(response => response.data);
 }
 
-function objectToUint8Array(obj: any) {
-    const string = JSON.stringify(obj);
-    const result = [];
-
-    for(let i = 0; i < string.length; i += 2) {
-        result.push(parseInt(string.substring(i, i + 2), 16));
-    }
-
-    return Uint8Array.from(result);
-}
-
 async function generateSignature(message: Message) {
     // create digital signature
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
         const copy = cleanMessage(JSON.parse(JSON.stringify(message)));
 
-        return await rsa.sign(objectToUint8Array(copy), JSON.parse(keys.payload).privateKey, 'SHA-256');
+        return await rsa.sign(new TextEncoder().encode(JSON.stringify(copy)), JSON.parse(keys.payload).privateKey, 'SHA-256');
+    }
+    else {
+        throw new Error(ErrorType.RSAKeyStoreNotFound);
+    }
+}
+
+async function encryptObject(object: any, key: JsonWebKey): Promise<{ ciphertext: string, key: Uint8Array }> {
+    const randomAESKey = uuidv4();
+    const encryptedAESKey = await rsa.encrypt(new TextEncoder().encode(randomAESKey), key, 'SHA-256');
+
+    return {
+        ciphertext: aes.encrypt(JSON.stringify(object), randomAESKey).toString(),
+        key: encryptedAESKey
+    };
+}
+
+async function decryptDataIntoObject(data: { ciphertext: string, key: ArrayBuffer }) {
+    // create digital signature
+    const keys = await Database.app.get('rsa-keystore');
+    if (keys) {
+        // decrypt AES key
+        const key = new Uint8Array(data.key);
+        const aesKey = await rsa.decrypt(key, JSON.parse(keys.payload).privateKey, 'SHA-256');
+        
+        // decrypt data using AES key
+        const decryptedData = aes.decrypt(data.ciphertext, new TextDecoder().decode(aesKey));        
+
+        return JSON.parse(decryptedData.toString(utf8Encoder));
     }
     else {
         throw new Error(ErrorType.RSAKeyStoreNotFound);
@@ -197,31 +216,45 @@ async function generateSignature(message: Message) {
 export function sendMessage(message: Message): Promise<boolean> {
     return new Promise<boolean>(async (resolve, reject) => {
         try {
-            const connection = await peerBank.getDataConnectionForUsername(message.receiverUsername);
+            const connection = await peerBank.getDataConnectionForUsername(message.receiverUsername);            
 
             // create digital signature
             const signature = await generateSignature(message);
 
-            connection.send({
-                message,
-                signature,
-                type: MessageType.Text
+            // encrypt message & signature
+            const receiver = await Database.contacts.get({
+                username: message.receiverUsername
             });
 
-            connection.on('data', data => {
-                // check for acknowledgement
-                if (data.type === MessageType.Acknowledgment) {
-                    console.log('Acknowledgement received from ' + message.receiverUsername);
-                    resolve(true);
-                }
-                else if (data.type === MessageType.AlreadyReceived) {
-                    console.log(message.receiverUsername + ' has already received the message.');
-                    resolve(true);
-                }
-            });            
-
-            // message timeout
-            setTimeout(() => reject(ErrorType.MessageTimeout), Globals.messageTimeoutDuration);
+            if (receiver) {
+                const encryptedData = await encryptObject({
+                    message,
+                    signature
+                }, receiver.publicKey);
+    
+                connection.send({
+                    encryptedData,
+                    type: MessageType.Text
+                });
+    
+                connection.on('data', data => {
+                    // check for acknowledgement
+                    if (data.type === MessageType.Acknowledgment) {
+                        console.log('Acknowledgement received from ' + message.receiverUsername);
+                        resolve(true);
+                    }
+                    else if (data.type === MessageType.AlreadyReceived) {
+                        console.log(message.receiverUsername + ' has already received the message.');
+                        resolve(true);
+                    }
+                });            
+    
+                // message timeout
+                setTimeout(() => reject(ErrorType.MessageTimeout), Globals.messageTimeoutDuration);
+            }
+            else {
+                throw new Error(ErrorType.ContactNotFound);
+            }      
         }
         catch (e: any) {
             reject(false);
