@@ -123,7 +123,7 @@ const ChatPanel = () => {
     
                 {/* ChatPanel Message Input */}
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', p: 2 }}>
-                    <TextField fullWidth value={typedMessage} onChange={e => setTypedMessage(e.target.value)} size='small' label='Type a Message' variant='outlined' />
+                    <TextField fullWidth onKeyPress={e => e.key === 'Enter' && onSendMessageButtonClick()} value={typedMessage} onChange={e => setTypedMessage(e.target.value)} size='small' label='Type a Message' variant='outlined' />
                     <IconButton onClick={onSendMessageButtonClick}>
                         <SendIcon />
                     </IconButton>
