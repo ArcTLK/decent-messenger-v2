@@ -1,4 +1,5 @@
 import Peer, { DataConnection } from 'peerjs';
+import rsa from 'js-crypto-rsa';
 import { Globals } from "../Constants";
 import ErrorType from '../enums/ErrorType';
 import MessageType from '../enums/MessageType';
@@ -29,14 +30,15 @@ export function connectToPeerServer(host: string, port: number, updatePeerServer
     return peer;
 }
 
-function transformMessageBeforeStoring(message: Message) {
+function cleanMessage(message: Message) {
     delete message.id;
-    message.createdAt = new Date(message.createdAt);
+    delete message._ignore;
+
     return message;
 }
 
-export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: string): Promise<string> {
-    return new Promise<string>(async (resolve, reject) => {
+export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: string): Promise<JsonWebKey> {
+    return new Promise<JsonWebKey>(async (resolve, reject) => {
         try {
             Database.app.get('rsa-keystore').then(async data => {
                 if (data) {
@@ -92,13 +94,32 @@ export function listenForMessages(peer: Peer) {
                         senderUsername: data.message.senderUsername
                     }).then(msg => {
                         if (!msg) {
-                            Database.messages.add(transformMessageBeforeStoring(data.message)).then(() => {
-                                // send acknowledgement
-                                console.log('Sending acknowledgement to ' + data.message.senderUsername);
-                                dataConnection.send({
-                                    type: MessageType.Acknowledgment
-                                });
-                            });
+                            // verify signature
+                            Database.contacts.get({
+                                username: data.message.senderUsername
+                            }).then(user => {
+                                if (user) {
+                                    const message = cleanMessage(data.message);
+
+                                    rsa.verify(objectToUint8Array(message), data.signature, user.publicKey, 'SHA-256').then(valid => {
+                                        if (valid) {
+                                            Database.messages.add(message).then(() => {
+                                                // send acknowledgement
+                                                console.log('Sending acknowledgement to ' + data.message.senderUsername);
+                                                dataConnection.send({
+                                                    type: MessageType.Acknowledgment
+                                                });
+                                            });
+                                        }
+                                        else {
+                                            console.error('Digital signature verification failed!');
+                                        }                                     
+                                    });                                    
+                                }
+                                else {
+                                    throw new Error(ErrorType.ContactNotFound);
+                                }
+                            });                            
                         }
                         else {
                             console.log('Received duplicated message for nonce ' + data.message.nonce);
@@ -149,13 +170,41 @@ export function getPeerDataFromUsername(username: string): Promise<PeerData> {
     return ApiClient.get(`users/${username}`).then(response => response.data);
 }
 
+function objectToUint8Array(obj: any) {
+    const string = JSON.stringify(obj);
+    const result = [];
+
+    for(let i = 0; i < string.length; i += 2) {
+        result.push(parseInt(string.substring(i, i + 2), 16));
+    }
+
+    return Uint8Array.from(result);
+}
+
+async function generateSignature(message: Message) {
+    // create digital signature
+    const keys = await Database.app.get('rsa-keystore');
+    if (keys) {
+        const copy = cleanMessage(JSON.parse(JSON.stringify(message)));
+
+        return await rsa.sign(objectToUint8Array(copy), JSON.parse(keys.payload).privateKey, 'SHA-256');
+    }
+    else {
+        throw new Error(ErrorType.RSAKeyStoreNotFound);
+    }
+}
+
 export function sendMessage(message: Message): Promise<boolean> {
     return new Promise<boolean>(async (resolve, reject) => {
         try {
             const connection = await peerBank.getDataConnectionForUsername(message.receiverUsername);
-            
+
+            // create digital signature
+            const signature = await generateSignature(message);
+
             connection.send({
                 message,
+                signature,
                 type: MessageType.Text
             });
 
@@ -176,7 +225,7 @@ export function sendMessage(message: Message): Promise<boolean> {
         }
         catch (e: any) {
             reject(false);
-            throw new Error(e.response.data.error);
+            throw e;
         }
     });
 }

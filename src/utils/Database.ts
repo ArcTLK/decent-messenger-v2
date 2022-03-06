@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import rsa from 'js-crypto-rsa';
 import AppData from '../models/AppData';
 import Contact from '../models/Contact';
 import Message from '../models/Message';
@@ -10,11 +11,26 @@ class Database extends Dexie {
 
     constructor() {
         super('decent-db');
-        this.version(4).stores({
-            messages: '++id, senderUsername, receiverUsername, status, nonce',
+        this.version(5).stores({
+            messages: '++id, [nonce+senderUsername], receiverUsername, status, senderUsername',
             contacts: '++id, username',
             app: 'type'
         });
+
+        this.on('ready', () => {
+            // check if RSA key store exists
+            this.app.get('rsa-keystore').then(async data => {
+                if (!data) {
+                    console.log('RSA Keystore not found, generating new key pair.');
+                    // generate and store keys
+                    const key = await rsa.generateKey(2048);
+                    this.app.add({
+                        type: 'rsa-keystore',
+                        payload: JSON.stringify(key)
+                    });
+                }
+            });
+        }, true);
     }
 
     erase() {

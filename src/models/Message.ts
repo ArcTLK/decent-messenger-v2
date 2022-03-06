@@ -8,12 +8,14 @@ export default interface Message {
     senderUsername: string;
     receiverUsername: string;
     nonce: string;
-    createdAt: Date;
+    createdAt: number; // timestamp
 
 
     // and not these
-    sentAt?: Date;
-    retriedAt?: Date;
-    retries?: number;
+    _ignore?: {
+        sentAt?: Date;
+        retriedAt?: Date;
+        retries?: number;
+    }
     id?: IndexableType;
 }

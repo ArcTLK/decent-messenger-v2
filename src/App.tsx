@@ -15,7 +15,6 @@ import Database from './utils/Database';
 import User from './models/User';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { deepPurple, grey } from '@mui/material/colors';
-import rsa from 'js-crypto-rsa';
 
 const themeLight = createTheme({
 	palette: {
@@ -56,19 +55,6 @@ function App() {
 			}
 			else {
 				console.log('No User data exists in local DB.');
-			}
-		});
-
-		// check if RSA key store exists
-		Database.app.get('rsa-keystore').then(async data => {
-			if (!data) {
-				console.log('RSA Keystore not found, generating new key pair');
-				// generate and store keys
-				const key = await rsa.generateKey(2048);
-				Database.app.add({
-					type: 'rsa-keystore',
-					payload: JSON.stringify(key)
-				});
 			}
 		});
 	}, []);

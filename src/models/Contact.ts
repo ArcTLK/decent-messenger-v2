@@ -1,6 +1,6 @@
 export default interface Contact {
     name: string;
     username: string;
-    publicKey: string;
+    publicKey: JsonWebKey;
     id?: number;    
 }

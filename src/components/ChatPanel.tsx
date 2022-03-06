@@ -50,7 +50,7 @@ const ChatPanel = () => {
         const message: Message = {
             content: typedMessage,
             status: MessageStatus.Queued,
-            createdAt: new Date(),
+            createdAt: new Date().getTime(),
             senderUsername: state.user.username,
             receiverUsername: state.currentChatUser.username,
             nonce: uuidv4()
@@ -69,7 +69,7 @@ const ChatPanel = () => {
 
     const retrySendingMessage = (message: Message) => {
         console.log('Retrying: ', message);
-        delete message.retries;
+        delete message._ignore;
         message.status = MessageStatus.Queued;
         Database.messages.update(message.id!, {
             status: MessageStatus.Queued
@@ -103,7 +103,7 @@ const ChatPanel = () => {
                             <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.content}</Box>
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'end', alignItems: 'center'}}>
                                 <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
-                                    {message.createdAt.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    {new Date(message.createdAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </Box>
                                 {message.senderUsername===state.user.username && <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'}>
                                 {

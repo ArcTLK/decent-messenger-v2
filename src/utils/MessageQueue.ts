@@ -30,15 +30,18 @@ export default class MessageQueue {
         this.messages.forEach(item => {
             // check state
             if (item.status === MessageStatus.Queued) {
-                if ((!item.retriedAt || (now - item.retriedAt.getTime() >= Globals.messageRetryInterval))) {
-                    if (!item.retries) {
-                        item.retries = 1;
+                if (!item._ignore) {
+                    item._ignore = {};
+                }
+                if ((!item._ignore.retriedAt || (now - item._ignore.retriedAt.getTime() >= Globals.messageRetryInterval))) {
+                    if (!item._ignore.retries) {
+                        item._ignore.retries = 1;
                     }
                     else {
-                        ++item.retries;
+                        ++item._ignore.retries;
                     }
-                    if (item.retries <= Globals.maxRetries) {
-                        console.log(`Trying to send a message to ${item.receiverUsername} (${item.retries})`);
+                    if (item._ignore.retries <= Globals.maxRetries) {
+                        console.log(`Trying to send a message to ${item.receiverUsername} (${item._ignore.retries})`);
                         sendMessage(item).then(() => {
                             item.status = MessageStatus.Sent;
     
