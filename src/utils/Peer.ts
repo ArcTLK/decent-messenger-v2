@@ -33,11 +33,12 @@ export function connectToPeerServer(host: string, port: number, updatePeerServer
     return peer;
 }
 
-function cleanMessage(message: Message) {
-    delete message.id;
-    delete message._ignore;
+function cleanMessage(message: Message): Message {
+    const copy = JSON.parse(JSON.stringify(message));
+    delete copy.id;
+    delete copy._ignore;
 
-    return message;
+    return copy;
 }
 
 export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: string): Promise<JsonWebKey> {
@@ -176,9 +177,9 @@ async function generateSignature(message: Message) {
     // create digital signature
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
-        const copy = cleanMessage(JSON.parse(JSON.stringify(message)));
+        const cleanedMessage = cleanMessage(message);
 
-        return await rsa.sign(new TextEncoder().encode(JSON.stringify(copy)), JSON.parse(keys.payload).privateKey, 'SHA-256');
+        return await rsa.sign(new TextEncoder().encode(JSON.stringify(cleanedMessage)), JSON.parse(keys.payload).privateKey, 'SHA-256');
     }
     else {
         throw new Error(ErrorType.RSAKeyStoreNotFound);
