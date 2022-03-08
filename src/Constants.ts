@@ -1,8 +1,8 @@
 export const Globals = {
     api: {
-        protocol: 'http',
-        host: '65.0.75.32',
-        port: 8080,
+        protocol: 'https',
+        host: 'api.decent-messenger.me',
+        port: 443,
         endpoint: {
             peerjs: '/peerjs',
             app: '/api'

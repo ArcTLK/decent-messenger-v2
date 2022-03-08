@@ -16,7 +16,8 @@ export function connectToPeerServer(host: string, port: number, updatePeerServer
     const peer = new Peer({
         host: host,
         port: port,
-        path: Globals.api.endpoint.peerjs
+        path: Globals.api.endpoint.peerjs,
+        secure: true
     });
 
     peer.on('open', id => {
