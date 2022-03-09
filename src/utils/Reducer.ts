@@ -19,6 +19,8 @@ const Reducer = (state: ContextModel, action: Action): ContextModel => {
             return updateState(state, { currentChatUser: { ...state.currentChatUser, ...action.payload } });
         case 'RevertState':
             return initialState;
+        case 'UpdateSnackbar':
+            return updateState(state, { snackbar: { ...state.snackbar, ...action.payload } });
         default:
             return state;
     }
