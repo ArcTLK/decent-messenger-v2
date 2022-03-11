@@ -2,19 +2,22 @@ import Dexie, { Table } from 'dexie';
 import rsa from 'js-crypto-rsa';
 import AppData from '../models/AppData';
 import Contact from '../models/Contact';
+import Log from '../models/Log';
 import Message from '../models/Message';
 
 class Database extends Dexie {
     messages!: Table<Message>;
     contacts!: Table<Contact>;
     app!: Table<AppData>;
+    logs!: Table<Log>;
 
     constructor() {
         super('decent-db');
         this.version(5).stores({
             messages: '++id, [nonce+senderUsername], receiverUsername, status, senderUsername',
             contacts: '++id, username',
-            app: 'type'
+            app: 'type',
+            logs: '++id'
         });
 
         this.on('ready', () => {

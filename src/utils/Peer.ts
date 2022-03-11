@@ -63,6 +63,10 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
                         }
                     });
 
+                    connection.on('error', err => {
+                        console.log(err);
+                    });
+
                     // message timeout
                     setTimeout(() => reject(ErrorType.KeyExchangeTimeout), Globals.messageTimeoutDuration);                    
                 }
