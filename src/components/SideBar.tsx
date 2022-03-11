@@ -11,6 +11,9 @@ import Database from '../utils/Database';
 import { doRsaPublicKeyExchange, getPeerDataFromUsername, peerBank } from '../utils/Peer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import ErrorType from '../enums/ErrorType';
+import { addLog } from '../models/Log';
+import { v4 } from 'uuid';
+import LogType from '../enums/LogType';
 
 const SideBar = () => {
     const {state, dispatch} = useContext(Context);
@@ -25,9 +28,11 @@ const SideBar = () => {
 
     const onAddContactButtonClick = () => {
         // Handle Add Contact Here
+        const uuid = v4();
+        addLog('Fetching Peer Data for ' + searchUser, uuid, 'Adding Contact (Sender)');
         getPeerDataFromUsername(searchUser).then(peerData => {
-            console.log('Executing RSA public key exchange for user ' + searchUser);
-            doRsaPublicKeyExchange(state.user.username, searchUser).then(key => {
+            addLog('Executing RSA public key exchange for user ' + searchUser, uuid, 'Adding Contact (Sender)');
+            doRsaPublicKeyExchange(state.user.username, searchUser, uuid).then(key => {
                 // create contact object
                 const contact: Contact = {
                     name: peerData.name,
@@ -36,6 +41,8 @@ const SideBar = () => {
                 };
 
                 Database.contacts.add(contact);              
+
+                addLog('Created and saved contact for ' + searchUser, uuid, 'Adding Contact (Sender)', LogType.Info, 1);
                 setSearchUser('');
             }).catch(error => {
                 if (error === ErrorType.KeyExchangeTimeout) {

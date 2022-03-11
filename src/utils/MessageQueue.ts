@@ -3,6 +3,8 @@ import MessageStatus from "../enums/MessageStatus";
 import Message from "../models/Message";
 import Database from "./Database";
 import { peerBank, sendMessage } from "./Peer";
+import { addLog } from '../models/Log';
+import LogType from "../enums/LogType";
 export default class MessageQueue {
     messages: Message[] = [];
 
@@ -40,9 +42,11 @@ export default class MessageQueue {
                     else {
                         ++item._ignore.retries;
                     }
-                    if (item._ignore.retries <= Globals.maxRetries) {
-                        console.log(`Trying to send a message to ${item.receiverUsername} (${item._ignore.retries})`);
-                        sendMessage(item).then(() => {
+
+                    const key = item.nonce + `-${item._ignore.retries}`;
+                    if (item._ignore.retries <= Globals.maxRetries) {                        
+                        addLog(`Trying to send the message to ${item.receiverUsername}`, key, 'Sending Message');
+                        sendMessage(item, key).then(() => {
                             item.status = MessageStatus.Sent;
     
                             // update db and remove from queue
@@ -50,8 +54,10 @@ export default class MessageQueue {
                                 status: MessageStatus.Sent
                             });
                             this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
+                            
+                            addLog(`Received acknowledgement, marking message as sent.`, key, 'Sending Message', LogType.Info, 1);
                         }).catch(error => {
-                            console.error(error);
+                            addLog(error, key, 'Sending Message', LogType.Error, 1);
                         }).finally(() => {
                             peerBank.releaseUsage(item.receiverUsername);
                         });
@@ -62,7 +68,7 @@ export default class MessageQueue {
                         Database.messages.update(item.id!, {
                             status: MessageStatus.Failed
                         });
-                        this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);                        
+                        this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);                     
                     }
                 }
             }
@@ -73,7 +79,6 @@ export default class MessageQueue {
     }
 
     addMessage(message: Message) {
-        console.log('Added message "' + message.content + '" to queue');
         this.messages.push(message);
         this.retrySendingMessages();
     }

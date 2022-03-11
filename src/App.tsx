@@ -16,6 +16,10 @@ import User from './models/User';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { deepPurple, grey } from '@mui/material/colors';
 import SnackbarElement from './components/SnackbarElement';
+import { useLiveQuery } from 'dexie-react-hooks';
+import LogType from "./enums/LogType";
+import { addLog } from './models/Log';
+import { IndexableType } from 'dexie';
 
 const themeLight = createTheme({
 	palette: {
@@ -40,6 +44,40 @@ function App() {
 	const [registeringUsername, setRegisteringUsername] = useState('');
 	const [registeringName, setRegisteringName] = useState('');
 
+	// db based console logging
+	useLiveQuery(async () => {
+        let doneLogs = await Database
+            .logs
+			.where({ done: 1 })
+			.toArray();	
+		
+		const shownLogs: IndexableType[] = [];
+
+		for (let log of doneLogs) {
+			const logs = await Database.logs.where({ groupId: log.groupId }).sortBy('timestamp');
+			console.group(log.groupName);
+
+			for (let logItem of logs) {
+				if (logItem.type === LogType.Info) {
+					console.log(logItem.text);
+				}
+				else if (logItem.type === LogType.Warn) {
+					console.warn(logItem.text);
+				}
+				else if (logItem.type === LogType.Error) {
+					console.error(logItem.text);
+				}
+				shownLogs.push(logItem.id!);
+			}
+			console.groupEnd();
+		}
+
+		await Database.logs.bulkDelete(shownLogs);
+		// delete old logs
+		const oldLogs = await Database.logs.where('timestamp').belowOrEqual(new Date().getTime() - 1800000).toArray();
+		await Database.logs.bulkDelete(oldLogs.map(x => x.id!));
+    }, []);
+
 	useEffect(() => {
 		// check if user object exists
 		Database.app.get('user').then(data => {
@@ -55,13 +93,13 @@ function App() {
 				listenForMessages(peer);
 			}
 			else {
-				console.log('No User data exists in local DB.');
+				addLog('No User data exists in local DB.', '0', 'Initialization');
 			}
 		});
 	}, []);
 
 	const onSubmitRegistrationForm = () => {
-		console.log('Creating User');
+		addLog('Creating User', '0', 'Initialization');
 
 		ApiClient.post('users', {
 			name: registeringName,
@@ -76,6 +114,8 @@ function App() {
 				type: 'user',
 				payload: JSON.stringify(data)
 			});
+
+			addLog('Saving device key for authentication with Web Server.', '0', 'Initialization', LogType.Info, 1);
 
 			const peer = connectToPeerServer(Globals.api.host, Globals.api.port, data);
 			listenForMessages(peer);

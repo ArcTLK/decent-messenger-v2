@@ -11,6 +11,7 @@ import { Context } from '../utils/Store';
 import { messageQueue } from '../utils/MessageQueue';
 import Database from '../utils/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { addLog } from '../models/Log';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -62,13 +63,13 @@ const ChatPanel = () => {
         message.id = id;
 
         // add to message queue
+        addLog('Adding message to Queue', message.nonce + '-1', 'Sending Message');
         messageQueue.addMessage(message);
 
         setTypedMessage('');
     }
 
     const retrySendingMessage = (message: Message) => {
-        console.log('Retrying: ', message);
         delete message._ignore;
         message.status = MessageStatus.Queued;
         Database.messages.update(message.id!, {
