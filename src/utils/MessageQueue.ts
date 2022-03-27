@@ -1,11 +1,12 @@
 import { Globals } from "../Constants";
 import MessageStatus from "../enums/MessageStatus";
 import Database from "./Database";
-import { peerBank, sendMessage } from "./Peer";
+import { sendMessage } from "./Peer";
 import { addLog } from '../models/Log';
 import LogType from "../enums/LogType";
 import StoredMessage from "../models/message/StoredMessage";
 import PayloadMessage from "../models/message/PayloadMessage";
+import { peerBank } from "./PeerBank";
 export default class MessageQueue {
     messages: StoredMessage[] = [];
     retrying: boolean = false;
@@ -115,4 +116,3 @@ export default class MessageQueue {
 }
 
 export const messageQueue = new MessageQueue();
-export const groupMessageQueue = new MessageQueue();

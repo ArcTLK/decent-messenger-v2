@@ -9,12 +9,13 @@ import Contact from '../models/Contact';
 import { Context } from '../utils/Store';
 import { DeleteForever } from '@mui/icons-material';
 import Database from '../utils/Database';
-import { doRsaPublicKeyExchange, getPeerDataFromUsername, peerBank } from '../utils/Peer';
+import { doRsaPublicKeyExchange, getPeerDataFromUsername } from '../utils/Peer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import ErrorType from '../enums/ErrorType';
 import { addLog } from '../models/Log';
 import { v4 } from 'uuid';
 import LogType from '../enums/LogType';
+import { peerBank } from '../utils/PeerBank';
 
 const SideBar = () => {
     const {state, dispatch} = useContext(Context);
@@ -112,12 +113,10 @@ const SideBar = () => {
         <Dialog open={isCreateGroupDialogOpen} onClose={onCreateGroupDialogClose} fullWidth={true} maxWidth='xs'>
             <DialogTitle sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <GroupAddIcon />
-                <Typography variant="h6">Create Group</Typography>
+                <Typography variant="h6" component={'span'}>Create Group</Typography>
             </DialogTitle>
             <DialogContent dividers={true} sx={{ p: 2 }}>
-                <DialogContentText sx={{ mb: 2 }}>
-                    <TextField label="Group Name" onChange={e => setNewGroupName(e.target.value)} size='small' fullWidth />
-                </DialogContentText>
+                <TextField sx={{ mb: 2 }} label="Group Name" onChange={e => setNewGroupName(e.target.value)} size='small' fullWidth />
                 
                 <List sx={{ overflow: "auto" }} subheader={
                     <ListSubheader>Add Participants</ListSubheader>

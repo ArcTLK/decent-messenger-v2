@@ -2,6 +2,7 @@ import Dexie, { Table } from 'dexie';
 import rsa from 'js-crypto-rsa';
 import AppData from '../models/AppData';
 import Contact from '../models/Contact';
+import Group from '../models/Group';
 import Log from '../models/Log';
 import StoredMessage from '../models/message/StoredMessage';
 
@@ -10,6 +11,7 @@ class Database extends Dexie {
     contacts!: Table<Contact>;
     app!: Table<AppData>;
     logs!: Table<Log>;
+    groups!: Table<Group>;
 
     constructor() {
         super('decent-db');

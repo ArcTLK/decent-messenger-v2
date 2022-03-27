@@ -3,7 +3,8 @@ enum MessageType {
     Acknowledgment = 'Acknowledgement',
     AlreadyReceived = 'Already Received',
     KeyExchange = 'Key Exchange',
-    KeyExchangeReply = 'Key Exchange Reply'
+    KeyExchangeReply = 'Key Exchange Reply',
+    CreateGroup = 'Create Group'
 }
 
 
