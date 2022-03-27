@@ -56,7 +56,7 @@ export default class MessageQueue {
                         retries: item.retries
                     });
 
-                    const key = item.nonce + `-${item.retries.length}`;
+                    const key = item.createdAt + `-${item.retries.length}`;
                     addLog(`Trying to send the message to ${item.receiverUsername}`, key, 'Sending Message');
                     sendMessage(item, key).then(() => {
                         item.status = MessageStatus.Sent;

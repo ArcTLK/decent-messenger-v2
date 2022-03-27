@@ -9,7 +9,7 @@ import Contact from '../models/Contact';
 import { Context } from '../utils/Store';
 import { DeleteForever } from '@mui/icons-material';
 import Database from '../utils/Database';
-import { doRsaPublicKeyExchange, getPeerDataFromUsername } from '../utils/Peer';
+import { createGroup, doRsaPublicKeyExchange, getPeerDataFromUsername } from '../utils/Peer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import ErrorType from '../enums/ErrorType';
 import { addLog } from '../models/Log';
@@ -24,7 +24,7 @@ const SideBar = () => {
 
     const [isCreateGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
     
-    const [contactsInNewGroup, setContactsOfNewGroup] = useState([] as string[]);
+    const [contactsInNewGroup, setContactsOfNewGroup] = useState([] as Contact[]);
 
     const [newGroupName, setNewGroupName] = useState('');
     
@@ -73,12 +73,12 @@ const SideBar = () => {
         setCreateGroupDialogOpen(true);
     };
 
-    const handleToggleContactOnCreatingGroup = (username: string) => {
-        if(contactsInNewGroup.indexOf(username) !== -1) {
-            setContactsOfNewGroup(contactsInNewGroup.filter((us: string) => us !== username));
+    const handleToggleContactOnCreatingGroup = (contact: Contact) => {
+        if(contactsInNewGroup.includes(contact)) {
+            setContactsOfNewGroup(contactsInNewGroup.filter(x => x.username !== contact.username));
         }
         else {
-            setContactsOfNewGroup([...contactsInNewGroup, username]);
+            setContactsOfNewGroup([...contactsInNewGroup, contact]);
         }
     };
 
@@ -93,10 +93,9 @@ const SideBar = () => {
         console.log('Creating new group:', newGroupName);
         console.log('Participants:', contactsInNewGroup);
 
-        // todo - code to create new group
-        
-
-        //onCreateGroupDialogClose();
+        createGroup(state.user, newGroupName, contactsInNewGroup).then(() => {
+            onCreateGroupDialogClose();
+        });
     };
 
     const setCurrentChatUser = (contact: Contact) => {
@@ -124,9 +123,9 @@ const SideBar = () => {
                 >
                     {contacts && contacts.map((contact: Contact) => (
                         <ListItem key={contact.username} sx={{ p: 0 }}>
-                            <ListItemButton onClick={() => handleToggleContactOnCreatingGroup(contact.username)}>
+                            <ListItemButton onClick={() => handleToggleContactOnCreatingGroup(contact)}>
                                 <ListItemIcon>
-                                    <Checkbox edge="start" checked={contactsInNewGroup.indexOf(contact.username) !== -1} tabIndex={-1} disableRipple />
+                                    <Checkbox edge="start" checked={contactsInNewGroup.includes(contact)} tabIndex={-1} disableRipple />
                                 </ListItemIcon>
                                 <ListItemAvatar>
                                     <Avatar src={`https://avatars.dicebear.com/api/human/${contact.username}.svg`} alt={contact.name} />
@@ -156,7 +155,10 @@ const SideBar = () => {
                     </IconButton>
                     
                     {/* For Debugging */}
-                    <IconButton onClick={() => console.log(state)} sx={{ color: 'white' }}>
+                    <IconButton onClick={() => {
+                        console.log(state);
+                        Database.groups.toArray().then(data => console.log(data));
+                    }} sx={{ color: 'white' }}>
                         <BugReportIcon />
                     </IconButton>
 

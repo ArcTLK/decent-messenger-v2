@@ -47,12 +47,12 @@ const ChatPanel = () => {
             createdAt: new Date().getTime(),
             senderUsername: state.user.username,
             receiverUsername: state.currentChatUser.username,
-            nonce: uuidv4(),
-            type: MessageType.Text
+            type: MessageType.Text,
+            nonce: uuidv4()
         }
 
         // add to message queue
-        addLog('Adding message to Queue', message.nonce + '-1', 'Sending Message');
+        addLog('Adding message to Queue', message.createdAt + '-1', 'Sending Message');
         messageQueue.addMessage(message);
 
         setTypedMessage('');

@@ -6,4 +6,5 @@ export default interface SecurePayloadMessage extends PayloadMessage {
         key: Uint8Array
     };
     signature: Uint8Array;
+    secure: boolean;
 }

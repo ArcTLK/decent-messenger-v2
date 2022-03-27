@@ -5,4 +5,5 @@ export default interface Group {
     members: Contact[];
     admins: Contact[];
     encryptionKey: string;
+    createdAt: number;
 }
