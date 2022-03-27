@@ -1,8 +1,8 @@
 import Contact from "./Contact";
-import Message from "./Message";
+import StoredMessage from "./message/StoredMessage";
 
 export default interface Chat {
-    messages: Message[];
+    messages: StoredMessage[];
     participants: Contact[];
 
 }

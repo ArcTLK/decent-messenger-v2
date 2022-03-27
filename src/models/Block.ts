@@ -1,4 +1,4 @@
-import Message from "./Message";
+import PayloadMessage from "./message/PayloadMessage";
 
 interface Block {
     serial: number;
@@ -8,7 +8,7 @@ interface Block {
     nonce: string; // check nonce using totp
     hash?: string;
     previousHash?: string;
-    messages: Message[];   
+    messages: PayloadMessage[];   
 }
 
 export default Block;

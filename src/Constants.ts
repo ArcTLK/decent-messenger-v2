@@ -11,5 +11,6 @@ export const Globals = {
     messageRetryInterval: 3000,
     maxPeerConnections: 50,
     maxRetries: 3,
-    messageTimeoutDuration: 2500
+    messageTimeoutDuration: 2500,
+    maxErrorsBeforeTermination: 5
 }

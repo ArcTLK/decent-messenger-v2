@@ -1,7 +1,6 @@
 import { createContext } from 'react';
 import User from '../models/User';
 import Contact from '../models/Contact';
-import Message from '../models/Message';
 import SnackbarState from "../models/SnackbarState";
 import ContextModel from '../models/ContextModel';
 import Action from '../models/Action';

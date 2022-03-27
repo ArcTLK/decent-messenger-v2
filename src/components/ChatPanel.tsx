@@ -1,8 +1,7 @@
 import { useState, useContext, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Button, Box, Avatar, Divider, Typography, TextField, IconButton, List, ListItem, ListItemText } from '@mui/material';
+import { Button, Box, Avatar, Divider, Typography, TextField, IconButton } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
-import Message from '../models/Message';
 import DoneIcon from '@mui/icons-material/Done';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -12,6 +11,9 @@ import { messageQueue } from '../utils/MessageQueue';
 import Database from '../utils/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { addLog } from '../models/Log';
+import StoredMessage from '../models/message/StoredMessage';
+import PayloadMessage from '../models/message/PayloadMessage';
+import MessageType from '../enums/MessageType';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -27,6 +29,7 @@ const ChatPanel = () => {
             .equals(state.currentChatUser.username ?? '')
             .or('senderUsername')
             .equals(state.currentChatUser.username ?? '')
+            .and(x => x.type === MessageType.Text)
             .sortBy('createdAt');
     }, [state.currentChatUser]);
 
@@ -38,29 +41,15 @@ const ChatPanel = () => {
     }, [state.currentChatUser, messages]);
 
     const onSendMessageButtonClick = async () => {
-        // console.log('Send Message:', typedMessage);
-
-        // Handle Sending Message Here
-
-        // calculate serial - not required (using createdAt instead)
-        // const previousMessages = await Database.messages.where('receiverUsername').equals(state.currentChatUser.username).sortBy('serial');
-        // const previousMessage = previousMessages.pop();
-        // const serial = previousMessage ? previousMessage.serial + 1 : 0;
-
         // Construct message object
-        const message: Message = {
-            content: typedMessage,
-            status: MessageStatus.Queued,
+        const message: PayloadMessage = {
+            payload: typedMessage,
             createdAt: new Date().getTime(),
             senderUsername: state.user.username,
             receiverUsername: state.currentChatUser.username,
-            nonce: uuidv4()
+            nonce: uuidv4(),
+            type: MessageType.Text
         }
-
-        // add to DB
-        const id = await Database.messages.add(message);
-        
-        message.id = id;
 
         // add to message queue
         addLog('Adding message to Queue', message.nonce + '-1', 'Sending Message');
@@ -69,13 +58,8 @@ const ChatPanel = () => {
         setTypedMessage('');
     }
 
-    const retrySendingMessage = (message: Message) => {
-        delete message._ignore;
-        message.status = MessageStatus.Queued;
-        Database.messages.update(message.id!, {
-            status: MessageStatus.Queued
-        });
-        messageQueue.addMessage(message);
+    const retrySendingMessage = (message: StoredMessage) => {
+        messageQueue.retryMessage(message);
     };
 
     if(Object.keys(state.currentChatUser).length === 0) {
@@ -101,7 +85,7 @@ const ChatPanel = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexGrow: 1, overflow: 'auto', p: 2 }}>
                     {messages && messages.map((message, index) => (
                         <Box key={index} alignSelf={(message.senderUsername===state.user.username)? 'flex-end' : 'flex-start'} bgcolor={message.senderUsername===state.user.username? 'primary.main' : 'secondary.light'} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 2, m: 0.5, borderRadius: 2 }}>
-                            <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.content}</Box>
+                            <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.payload}</Box>
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'end', alignItems: 'center'}}>
                                 <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
                                     {new Date(message.createdAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}

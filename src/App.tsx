@@ -1,10 +1,7 @@
-import React, { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import Reducer from './utils/Reducer';
 import { ReactComponent as Logo } from './logo.svg';
 import { Context, initialState } from './utils/Store';
-import Contact from './models/Contact';
-import Message from './models/Message';
-import MessageStatus from './enums/MessageStatus';
 import { ApiClient } from './utils/ApiClient';
 import { connectToPeerServer, listenForMessages } from './utils/Peer';
 import { Globals } from './Constants';
@@ -12,7 +9,6 @@ import { Box, Typography, TextField, Divider, Button, SvgIcon, Dialog, DialogCon
 import SideBar from './components/SideBar';
 import ChatPanel from './components/ChatPanel';
 import Database from './utils/Database';
-import User from './models/User';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { deepPurple, grey } from '@mui/material/colors';
 import SnackbarElement from './components/SnackbarElement';

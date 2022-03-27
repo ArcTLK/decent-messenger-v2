@@ -3,10 +3,10 @@ import rsa from 'js-crypto-rsa';
 import AppData from '../models/AppData';
 import Contact from '../models/Contact';
 import Log from '../models/Log';
-import Message from '../models/Message';
+import StoredMessage from '../models/message/StoredMessage';
 
 class Database extends Dexie {
-    messages!: Table<Message>;
+    messages!: Table<StoredMessage>;
     contacts!: Table<Contact>;
     app!: Table<AppData>;
     logs!: Table<Log>;

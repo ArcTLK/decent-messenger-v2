@@ -1,12 +1,14 @@
 import { Globals } from "../Constants";
 import MessageStatus from "../enums/MessageStatus";
-import Message from "../models/Message";
 import Database from "./Database";
 import { peerBank, sendMessage } from "./Peer";
 import { addLog } from '../models/Log';
 import LogType from "../enums/LogType";
+import StoredMessage from "../models/message/StoredMessage";
+import PayloadMessage from "../models/message/PayloadMessage";
 export default class MessageQueue {
-    messages: Message[] = [];
+    messages: StoredMessage[] = [];
+    retrying: boolean = false;
 
     constructor() {
         // populate message queue from db
@@ -27,61 +29,90 @@ export default class MessageQueue {
     }
 
     retrySendingMessages() {
-        const now = new Date().getTime();
+        // retry lock
+        if (this.retrying) {
+            return;
+        }
+
+        this.retrying = true;
 
         this.messages.forEach(item => {
-            // check state
+            // check status
             if (item.status === MessageStatus.Queued) {
-                if (!item._ignore) {
-                    item._ignore = {};
+                // check if first attempt or max retries have passed
+                if ((!item.retry && item.retries.length > 0) || item.retries.length > Globals.maxRetries) {
+                    // update db and remove from queue
+                    item.status = MessageStatus.Failed;
+                    Database.messages.update(item.id!, {
+                        status: MessageStatus.Failed
+                    });
+                    this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
                 }
-                if ((!item._ignore.retriedAt || (now - item._ignore.retriedAt.getTime() >= Globals.messageRetryInterval))) {
-                    if (!item._ignore.retries) {
-                        item._ignore.retries = 1;
-                    }
-                    else {
-                        ++item._ignore.retries;
-                    }
+                // check if retry duration passed
+                else if (item.retries.length === 0 || item.retries[item.retries.length - 1].getTime() >= Globals.messageRetryInterval) {
+                    item.retries.push(new Date());
+                    Database.messages.update(item.id!, {
+                        retries: item.retries
+                    });
 
-                    const key = item.nonce + `-${item._ignore.retries}`;
-                    if (item._ignore.retries <= Globals.maxRetries) {                        
-                        addLog(`Trying to send the message to ${item.receiverUsername}`, key, 'Sending Message');
-                        sendMessage(item, key).then(() => {
-                            item.status = MessageStatus.Sent;
-    
-                            // update db and remove from queue
-                            Database.messages.update(item.id!, {
-                                status: MessageStatus.Sent
-                            });
-                            this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
-                            
-                            addLog(`Received acknowledgement, marking message as sent.`, key, 'Sending Message', LogType.Info, 1);
-                        }).catch(error => {
-                            addLog(error, key, 'Sending Message', LogType.Error, 1);
-                        }).finally(() => {
-                            peerBank.releaseUsage(item.receiverUsername);
-                        });
-                    }
-                    else {
+                    const key = item.nonce + `-${item.retries.length}`;
+                    addLog(`Trying to send the message to ${item.receiverUsername}`, key, 'Sending Message');
+                    sendMessage(item, key).then(() => {
+                        item.status = MessageStatus.Sent;
+
                         // update db and remove from queue
-                        item.status = MessageStatus.Failed;
                         Database.messages.update(item.id!, {
-                            status: MessageStatus.Failed
+                            status: MessageStatus.Sent,
                         });
-                        this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);                     
-                    }
+                        this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
+                        
+                        addLog(`Received acknowledgement, marking message as sent.`, key, 'Sending Message', LogType.Info, 1);
+                    }).catch(error => {
+                        addLog(error, key, 'Sending Message', LogType.Error, 1);
+                    }).finally(() => {
+                        peerBank.releaseUsage(item.receiverUsername);
+                    });
                 }
             }
             else {
                 this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
             }
         });
+
+        this.retrying = false;
     }
 
-    addMessage(message: Message) {
-        this.messages.push(message);
+    addMessage(message: PayloadMessage, retry: boolean = true) {
+        const storedMessage = {
+            ...message,
+            status: MessageStatus.Queued,
+            retry,
+            retries: []
+        } as StoredMessage;
+
+        this.messages.push(storedMessage);
+
+        // store it in db
+        Database.messages.add(storedMessage).then(() => {
+            this.retrySendingMessages();
+        });        
+    }
+
+    retryMessage(message: StoredMessage) {
+        Database.messages.update(message.id!, {
+            status: MessageStatus.Queued
+        });
+
+        this.messages.push({
+            ...message,
+            status: MessageStatus.Queued,
+            retry: true,
+            retries: []
+        });
+
         this.retrySendingMessages();
     }
 }
 
 export const messageQueue = new MessageQueue();
+export const groupMessageQueue = new MessageQueue();

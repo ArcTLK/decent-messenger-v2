@@ -6,13 +6,16 @@ import { v4 as uuidv4, v4 } from 'uuid';
 import { Globals } from "../Constants";
 import ErrorType from '../enums/ErrorType';
 import MessageType from '../enums/MessageType';
-import Message from '../models/Message';
 import PeerData from '../models/PeerData';
 import User from '../models/User';
 import { ApiClient } from './ApiClient';
 import Database from './Database';
 import { addLog } from '../models/Log';
 import LogType from '../enums/LogType';
+import { groupMessageQueue } from './MessageQueue';
+import StoredMessage from '../models/message/StoredMessage';
+import PayloadMessage from '../models/message/PayloadMessage';
+import SecurePayloadMessage from '../models/message/SecurePayloadMessage';
 
 export function connectToPeerServer(host: string, port: number, updatePeerServerWithConfig?: User): Peer {
     const peer = new Peer({
@@ -36,12 +39,22 @@ export function connectToPeerServer(host: string, port: number, updatePeerServer
     return peer;
 }
 
-function cleanMessage(message: Message): Message {
-    const copy = JSON.parse(JSON.stringify(message));
-    delete copy.id;
-    delete copy._ignore;
+function cleanMessage(message: StoredMessage | SecurePayloadMessage): PayloadMessage {
+    return {
+        payload: message.payload,
+        type: message.type, 
+        senderUsername: message.senderUsername,
+        receiverUsername: message.receiverUsername,
+        nonce: message.nonce,
+        createdAt: message.createdAt
+    };
+}
 
-    return copy;
+// member usernames
+export function createGroup(members: string[]) {
+    members.forEach(username => {
+        //groupMessageQueue.addMessage()
+    });
 }
 
 export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: string, logId?: string): Promise<JsonWebKey> {
@@ -57,8 +70,8 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
                     }
                     
                     connection.send({
-                        publicKey: keys.publicKey,
-                        username: ourUsername,
+                        payload: keys.publicKey,
+                        senderUsername: ourUsername,
                         type: MessageType.KeyExchange
                     });
 
@@ -90,39 +103,37 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
 export function listenForMessages(peer: Peer) {
     peer.on('connection', dataConnection => {
         console.log(`${dataConnection.peer} created a data channel connection to us.`);
-        dataConnection.on('data', data => {
-            if (data.type === MessageType.Text) {
+        dataConnection.on('data', (message: SecurePayloadMessage) => {
+            if (message.type === MessageType.Text) {
                 const uuid = v4();
-                addLog(`Someone sent us a message: ${data.encryptedData.ciphertext}`, uuid, 'Receiving Message');
+                addLog(`Received an encrypted payload: ${message.encryptedPayload.ciphertext} from ${message.senderUsername}`, uuid, 'Receiving Message');
                 // decrypt message
-                decryptDataIntoObject(data.encryptedData).then((decryptedData: { message: Message, signature: Uint8Array }) => {
+                decryptPayload(message.encryptedPayload).then(payload => {
+                    message.payload = payload;
+
                     // check if contact exists
                     Database.contacts.get({
-                        username: decryptedData.message.senderUsername
+                        username: message.senderUsername
                     }).then(contact => {
                         if (!contact) {
                             throw new Error(ErrorType.RSAKeyExchangeNotDone);
                         }
 
-                        addLog(`Decrypted message, it was ${decryptedData.message.senderUsername}`, uuid, 'Receiving Message');
+                        addLog(`Decrypted message: ${payload}`, uuid, 'Receiving Message');
 
                         // check nonce
                         Database.messages.get({
-                            nonce: decryptedData.message.nonce,
-                            senderUsername: decryptedData.message.senderUsername
+                            nonce: message.nonce,
+                            senderUsername: message.senderUsername
                         }).then(msg => {
                             if (!msg) {
                                 addLog(`Nonce is unique.`, uuid, 'Receiving Message');
                                 // verify signature
-                                const message = cleanMessage(decryptedData.message);
-
-                                // fix signature (got messed up due to encryption)
-                                const signature = Uint8Array.from(Object.values(decryptedData.signature));
-
-                                rsa.verify(new TextEncoder().encode(JSON.stringify(message)), signature, contact.publicKey, 'SHA-256').then(valid => {
+                                const cleanedMessage = cleanMessage(message);
+                                rsa.verify(new TextEncoder().encode(JSON.stringify(cleanedMessage)), new Uint8Array(message.signature), contact.publicKey, 'SHA-256').then(valid => {
                                     if (valid) {
                                         addLog(`Digital signature verified.`, uuid, 'Receiving Message');
-                                        Database.messages.add(message).then(() => {
+                                        Database.messages.add(cleanedMessage as StoredMessage).then(() => {
                                             // send acknowledgement
                                             addLog(`Sending acknowledgement to sender.`, uuid, 'Receiving Message', LogType.Info, 1);
                                             dataConnection.send({
@@ -149,16 +160,16 @@ export function listenForMessages(peer: Peer) {
                     console.error(error);
                 });
             }
-            else if (data.type === MessageType.KeyExchange) {
+            else if (message.type === MessageType.KeyExchange) {
                 // create a contact
                 const uuid = v4();
                 addLog(`Received someone's RSA public key, finding out who (asking Web Server).`, uuid, 'Adding Contact (Receiver)');
-                getPeerDataFromUsername(data.username).then(peerData => {             
-                    addLog(`Their username was ${data.username}.`, uuid, 'Adding Contact (Receiver)');
+                getPeerDataFromUsername(message.senderUsername).then(peerData => {             
+                    addLog(`Their name was ${peerData.name}.`, uuid, 'Adding Contact (Receiver)');
                     Database.contacts.add({
                         name: peerData.name,
-                        username: data.username,
-                        publicKey: data.publicKey
+                        username: message.senderUsername,
+                        publicKey: message.payload
                     }).then(() => {
                         addLog(`Created and saved their contact.`, uuid, 'Adding Contact (Receiver)');
                         Database.app.get('rsa-keystore').then(keys => {
@@ -194,7 +205,7 @@ export function getPeerDataFromUsername(username: string): Promise<PeerData> {
     return ApiClient.get(`users/${username}`).then(response => response.data);
 }
 
-async function generateSignature(message: Message) {
+async function generateSignature(message: StoredMessage) {
     // create digital signature
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
@@ -207,18 +218,40 @@ async function generateSignature(message: Message) {
     }
 }
 
-async function encryptObject(object: any, key: JsonWebKey): Promise<{ ciphertext: string, key: Uint8Array }> {
+async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMessage> {
+    const copy = JSON.parse(JSON.stringify(message));    
+
+    // create digital signature
+    copy.signature = await generateSignature(copy);
+
+    // encrypt payload
+    const receiver = await Database.contacts.get({
+        username: message.receiverUsername
+    });
+
+    if (receiver) {
+        copy.encryptedPayload = await encryptPayload(message.payload, receiver.publicKey);
+    }
+    else {
+        throw new Error(ErrorType.ContactNotFound);
+    } 
+
+    delete copy.payload;
+
+    return copy;
+}
+
+async function encryptPayload(payload: string, key: JsonWebKey): Promise<{ ciphertext: string, key: Uint8Array }> {
     const randomAESKey = uuidv4();
     const encryptedAESKey = await rsa.encrypt(new TextEncoder().encode(randomAESKey), key, 'SHA-256');
 
     return {
-        ciphertext: aes.encrypt(JSON.stringify(object), randomAESKey).toString(),
+        ciphertext: aes.encrypt(payload, randomAESKey).toString(),
         key: encryptedAESKey
     };
 }
 
-async function decryptDataIntoObject(data: { ciphertext: string, key: ArrayBuffer }) {
-    // create digital signature
+async function decryptPayload(data: { ciphertext: string, key: ArrayBuffer }): Promise<string> {
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
         // decrypt AES key
@@ -226,70 +259,50 @@ async function decryptDataIntoObject(data: { ciphertext: string, key: ArrayBuffe
         const aesKey = await rsa.decrypt(key, JSON.parse(keys.payload).privateKey, 'SHA-256');
         
         // decrypt data using AES key
-        const decryptedData = aes.decrypt(data.ciphertext, new TextDecoder().decode(aesKey));        
+        const decryptedPayload = aes.decrypt(data.ciphertext, new TextDecoder().decode(aesKey));        
 
-        return JSON.parse(decryptedData.toString(utf8Encoder));
+        return decryptedPayload.toString(utf8Encoder);
     }
     else {
         throw new Error(ErrorType.RSAKeyStoreNotFound);
     }
 }
 
-export function sendMessage(message: Message, logId?: string): Promise<boolean> {
+export function sendMessage(message: StoredMessage, logId?: string): Promise<boolean> {
     return new Promise<boolean>(async (resolve, reject) => {
         try {
             if (logId) {
                 addLog(`Opening a data channel to ${message.receiverUsername}`, logId, 'Sending Message');
             }
             
-            const connection = await peerBank.getDataConnectionForUsername(message.receiverUsername);           
+            const connection = await peerBank.getDataConnectionForUsername(message.receiverUsername);
+            
+            // secure message
+            const securedMessage = await secureMessage(cleanMessage(message));
 
-            // create digital signature
-            const signature = await generateSignature(message);
             if (logId) {
-                addLog(`Created Digital Signature using RSA-256: ${new TextDecoder().decode(signature)}`, logId, 'Sending Message');
+                addLog(`Created Digital Signature using RSA-256: ${new TextDecoder().decode(securedMessage.signature)}`, logId, 'Sending Message');
+                addLog(`Encrypted message using RSA-AES-256: ${securedMessage.encryptedPayload.ciphertext}`, logId, 'Sending Message');
             }
 
-            // encrypt message & signature
-            const receiver = await Database.contacts.get({
-                username: message.receiverUsername
-            });
+            connection.send(securedMessage);
 
-            if (receiver) {
-                const encryptedData = await encryptObject({
-                    message,
-                    signature
-                }, receiver.publicKey);
-
-                if (logId) {
-                    addLog(`Encrypted message using RSA-AES-256: ${encryptedData.ciphertext}`, logId, 'Sending Message');
-                }
-    
-                connection.send({
-                    encryptedData,
-                    type: MessageType.Text
-                });
-
-                if (logId) {
-                    addLog(`Message sent, waiting for acknowledgement.`, logId, 'Sending Message');
-                }
-    
-                connection.on('data', data => {
-                    // check for acknowledgement
-                    if (data.type === MessageType.Acknowledgment) {
-                        resolve(true);
-                    }
-                    else if (data.type === MessageType.AlreadyReceived) {
-                        resolve(true);
-                    }
-                });            
-    
-                // message timeout
-                setTimeout(() => reject(ErrorType.MessageTimeout), Globals.messageTimeoutDuration);
+            if (logId) {
+                addLog(`Message sent, waiting for acknowledgement.`, logId, 'Sending Message');
             }
-            else {
-                throw new Error(ErrorType.ContactNotFound);
-            }      
+
+            connection.on('data', data => {
+                // check for acknowledgement
+                if (data.type === MessageType.Acknowledgment) {
+                    resolve(true);
+                }
+                else if (data.type === MessageType.AlreadyReceived) {
+                    resolve(true);
+                }
+            });            
+
+            // message timeout
+            setTimeout(() => reject(ErrorType.MessageTimeout), Globals.messageTimeoutDuration);   
         }
         catch (e: any) {
             reject(false);
@@ -305,7 +318,8 @@ class PeerBank {
             inUse: number,
             lastUsed: Date,
             myPeer: Peer,
-            peerId: string
+            peerId: string,
+            errors: number
         }
     } = {};
     peerCount: number = 0;
@@ -349,7 +363,8 @@ class PeerBank {
                             lastUsed: new Date(),
                             inUse: 0,
                             myPeer: peer,
-                            peerId: peerData.peerId
+                            peerId: peerData.peerId,
+                            errors: 0
                         }
                         ++this.peerCount;
                         resolve();
@@ -392,7 +407,7 @@ class PeerBank {
         return new Promise<DataConnection>((resolve, reject) => {
             const dataConnection = peer.connect(this.peers[username].peerId);                
             dataConnection.on('open', () => { 
-                console.log('Connected to ' + username + ' on a data channel.');
+                // console.log('Connected to ' + username + ' on a data channel.');
                 this.peers[username].connection = dataConnection;
                 this.peers[username].lastUsed = new Date();
                 this.peers[username].inUse = 1;
@@ -438,6 +453,16 @@ class PeerBank {
         }
         else {
             console.error('Peer is being over-released for user ' + username);
+        }
+    }
+
+    reportError(username: string) {
+        if (this.peers[username]) {
+            this.peers[username].errors += 1;
+        }
+
+        if (this.peers[username].errors > Globals.maxErrorsBeforeTermination) {
+            this.removePeer(username);
         }
     }
 }

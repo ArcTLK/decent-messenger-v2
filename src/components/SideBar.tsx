@@ -93,8 +93,9 @@ const SideBar = () => {
         console.log('Participants:', contactsInNewGroup);
 
         // todo - code to create new group
+        
 
-        onCreateGroupDialogClose();
+        //onCreateGroupDialogClose();
     };
 
     const setCurrentChatUser = (contact: Contact) => {
