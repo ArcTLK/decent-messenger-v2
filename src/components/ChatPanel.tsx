@@ -14,6 +14,7 @@ import { addLog } from '../models/Log';
 import StoredMessage from '../models/message/StoredMessage';
 import PayloadMessage from '../models/message/PayloadMessage';
 import MessageType from '../enums/MessageType';
+import ChatType from '../enums/ChatType';
 import { createPayloadMessage } from '../utils/Peer';
 
 const ChatPanel = () => {
@@ -24,26 +25,29 @@ const ChatPanel = () => {
     const messagesEndRef = useRef<null | HTMLElement>(null);
 
     const messages = useLiveQuery(async () => {
+        // @ArcTLK modify below for group messages
         return await Database
             .messages
             .where('receiverUsername')
-            .equals(state.currentChatUser.username ?? '')
+            .equals(state.currentOpenedChat.data.username ?? '')
             .or('senderUsername')
-            .equals(state.currentChatUser.username ?? '')
+            .equals(state.currentOpenedChat.data.username ?? '')
             .and(x => x.type === MessageType.Text)
             .sortBy('createdAt');
-    }, [state.currentChatUser]);
+    }, [state.currentOpenedChat]);
 
     useEffect(() => {
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
 
-    }, [state.currentChatUser, messages]);
+    }, [state.currentOpenedChat, messages]);
 
     const onSendMessageButtonClick = async () => {
         // Construct message object
-        const message = await createPayloadMessage(typedMessage, MessageType.Text, state.currentChatUser.username);
+
+        // @ArcTLK - Modify below for group msgs
+        const message = await createPayloadMessage(typedMessage, MessageType.Text, state.currentOpenedChat.data.username);
 
         // add to message queue
         addLog('Adding message to Queue', message.createdAt + '-1', 'Sending Message');
@@ -56,10 +60,10 @@ const ChatPanel = () => {
         messageQueue.retryMessage(message);
     };
 
-    if(Object.keys(state.currentChatUser).length === 0) {
+    if(Object.keys(state.currentOpenedChat).length === 0) {
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flexGrow: 3 }}>
-                <Typography variant='body1'>Select User to Chat</Typography>
+                <Typography variant='body1'>Select User/Group to Chat</Typography>
             </Box>
         );
     }
@@ -69,8 +73,8 @@ const ChatPanel = () => {
             
                 {/* ChatPanel Header */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2, bgcolor: 'primary.main' }}>
-                    <Avatar src={`https://avatars.dicebear.com/api/human/${state.currentChatUser.username}.svg`} />
-                    <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentChatUser.name}</Typography>
+                    <Avatar src={`https://avatars.dicebear.com/api/human/${(state.currentOpenedChat.type == ChatType.Private)? state.currentOpenedChat.data.username : state.currentOpenedChat.data.name}.svg`} />
+                    <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentOpenedChat.data.name}</Typography>
                 </Box>
 
                 <Divider />
@@ -79,6 +83,10 @@ const ChatPanel = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexGrow: 1, overflow: 'auto', p: 2 }}>
                     {messages && messages.map((message, index) => (
                         <Box key={index} alignSelf={(message.senderUsername===state.user.username)? 'flex-end' : 'flex-start'} bgcolor={message.senderUsername===state.user.username? 'primary.main' : 'secondary.light'} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 2, m: 0.5, borderRadius: 2 }}>
+                            {state.currentOpenedChat.type == ChatType.Group && <Box sx={{ display: 'flex', alignItems: 'center'}}>
+                                {/* Fetch name of user via username below */}
+                                {message.senderUsername}
+                            </Box>}
                             <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.payload}</Box>
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'end', alignItems: 'center'}}>
                                 <Box color={message.senderUsername===state.user.username? '#d1c4e9' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>

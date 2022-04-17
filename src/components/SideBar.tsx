@@ -15,6 +15,7 @@ import ErrorType from '../enums/ErrorType';
 import { addLog } from '../models/Log';
 import { v4 } from 'uuid';
 import LogType from '../enums/LogType';
+import ChatType from '../enums/ChatType';
 import { peerBank } from '../utils/PeerBank';
 import Group from '../models/Group';
 
@@ -105,10 +106,13 @@ const SideBar = () => {
         });
     };
 
-    const setCurrentChatUser = (contact: Contact | Group) => {
+    const setCurrentChat = (type: ChatType, data: Contact | Group) => {
         dispatch({
-            type: 'UpdateCurrentChatUser',
-            payload: contact
+            type: 'UpdateCurrentChat',
+            payload: {
+                type: type,
+                data: data
+            }
         });
     };
 
@@ -204,7 +208,7 @@ const SideBar = () => {
             {/* RecentChatUsers */}
             <List sx={{ overflow: "auto" }}>
                 {groups && groups.filter((group: Group) => group.name.toLowerCase().includes(searchUser.toLowerCase())).map((group: Group) => (
-                    <ListItemButton key={group.createdAt} selected={Object.keys(state.currentChatUser).length !== 0 && state.currentChatUser.name === group.name} onClick={() => setCurrentChatUser(group)}>
+                    <ListItemButton key={group.createdAt} selected={Object.keys(state.currentOpenedChat).length !== 0 && state.currentOpenedChat.data.name === group.name} onClick={() => setCurrentChat(ChatType.Group, group)}>
                         <ListItemAvatar>
                             <Avatar src={`https://avatars.dicebear.com/api/human/${group.name}.svg`} alt={group.name} />
                         </ListItemAvatar>
@@ -216,7 +220,7 @@ const SideBar = () => {
                 ))}
 
                 {contacts && contacts.filter((contact: Contact) => contact.name.toLowerCase().includes(searchUser.toLowerCase())).map((contact: Contact) => (
-                    <ListItemButton key={contact.username} selected={Object.keys(state.currentChatUser).length !== 0 && state.currentChatUser.username === contact.username} onClick={() => setCurrentChatUser(contact)}>
+                    <ListItemButton key={contact.username} selected={Object.keys(state.currentOpenedChat).length !== 0 && state.currentOpenedChat.data.username === contact.username} onClick={() => setCurrentChat(ChatType.Private, contact)}>
                         <ListItemAvatar>
                             <Avatar src={`https://avatars.dicebear.com/api/human/${contact.username}.svg`} alt={contact.name} />
                         </ListItemAvatar>

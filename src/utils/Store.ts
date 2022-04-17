@@ -3,6 +3,7 @@ import User from '../models/User';
 import Contact from '../models/Contact';
 import SnackbarState from "../models/SnackbarState";
 import ContextModel from '../models/ContextModel';
+import OpenedChat from '../models/OpenedChat';
 import Action from '../models/Action';
 import { Dispatch } from 'react';
 
@@ -13,7 +14,7 @@ interface ContextStore {
 
 export let initialState: ContextModel = {
     user: {} as User,
-    currentChatUser: {} as Contact,
+    currentOpenedChat: {} as OpenedChat,
     snackbar: {
         isOpen: false,
         type: 'info',
