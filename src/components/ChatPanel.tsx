@@ -14,6 +14,7 @@ import { addLog } from '../models/Log';
 import StoredMessage from '../models/message/StoredMessage';
 import PayloadMessage from '../models/message/PayloadMessage';
 import MessageType from '../enums/MessageType';
+import { createPayloadMessage } from '../utils/Peer';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -42,14 +43,7 @@ const ChatPanel = () => {
 
     const onSendMessageButtonClick = async () => {
         // Construct message object
-        const message: PayloadMessage = {
-            payload: typedMessage,
-            createdAt: new Date().getTime(),
-            senderUsername: state.user.username,
-            receiverUsername: state.currentChatUser.username,
-            type: MessageType.Text,
-            nonce: uuidv4()
-        }
+        const message = await createPayloadMessage(typedMessage, MessageType.Text, state.currentChatUser.username);
 
         // add to message queue
         addLog('Adding message to Queue', message.createdAt + '-1', 'Sending Message');

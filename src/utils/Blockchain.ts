@@ -4,7 +4,7 @@ class Blockchain {
     blocks: Block[];
 
     addBlock(block: Block) {
-        
+        this.blocks.push(block);
     }
 }
 

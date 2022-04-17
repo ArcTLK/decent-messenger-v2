@@ -1,14 +1,18 @@
-import PayloadMessage from "./message/PayloadMessage";
+interface BlockMessageItem {
+    senderUsername: string;
+    digitalSignature: string;
+    createdAt: number;
+    message: string;
+}
 
 interface Block {
     serial: number;
     timestamp: number;
-    authorisedDigitalSignature: string;
+    digitalSignature: string;
     encryptionKeyHash: string;
-    nonce: string; // check nonce using totp
-    hash?: string;
-    previousHash?: string;
-    messages: PayloadMessage[];   
+    hash: string;
+    previousHash: string;
+    messages: BlockMessageItem[];   
 }
 
 export default Block;

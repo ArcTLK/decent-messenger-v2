@@ -4,7 +4,10 @@ enum MessageType {
     AlreadyReceived = 'Already Received',
     KeyExchange = 'Key Exchange',
     KeyExchangeReply = 'Key Exchange Reply',
-    CreateGroup = 'Create Group'
+    CreateGroup = 'Create Group',
+    AddBlock = 'Add Block',
+    ConnectToBlockCreator = 'Connect to block creator',
+    AskForBlockCreator = 'Ask for block creator'
 }
 
 

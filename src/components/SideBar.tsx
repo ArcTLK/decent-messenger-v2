@@ -4,7 +4,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import BugReportIcon from '@mui/icons-material/BugReport';
-import { Button, Checkbox, Dialog, DialogActions, DialogTitle, DialogContent, DialogContentText, Box, TextField, Avatar, IconButton, Divider, List, ListItem, ListSubheader, ListItemButton, ListItemIcon, ListItemAvatar, ListItemText, Typography } from '@mui/material';
+import { Button, Checkbox, Dialog, DialogActions, DialogTitle, DialogContent, DialogContentText, Box, TextField, Avatar, IconButton, Divider, List, ListItem, ListSubheader, ListItemButton, ListItemIcon, ListItemAvatar, ListItemText, Typography, Stack } from '@mui/material';
 import Contact from '../models/Contact';
 import { Context } from '../utils/Store';
 import { DeleteForever } from '@mui/icons-material';
@@ -154,7 +154,10 @@ const SideBar = () => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: 'primary.main' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Avatar src={`https://avatars.dicebear.com/api/human/${state.user.username}.svg`} />
-                    <Typography variant="h6" sx={{ color: 'white' }}>{state.user.name}</Typography>
+                    <Stack>
+                        <Typography variant="h6" sx={{ color: 'white' }}>{state.user.name}</Typography>
+                        <Typography variant="body2" sx={{ color: '#ccc' }}>{state.user.username}</Typography>
+                    </Stack>                    
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'end', alignItems: 'center' }}>
                     <IconButton onClick={onSettingsButtonClick} sx={{ color: 'white' }}>

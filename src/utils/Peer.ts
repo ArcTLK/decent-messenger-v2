@@ -22,7 +22,27 @@ import Contact from '../models/Contact';
 import Group from '../models/Group';
 
 // helper functions
-function cleanMessage(message: StoredMessage | SecurePayloadMessage): PayloadMessage {
+export async function createPayloadMessage(payload: any, type: MessageType, receiverUsername: string): Promise<PayloadMessage> {
+    const user = await Database.app.get('user');
+
+    if (user) {
+        const userData = JSON.parse(user.payload);
+
+        return {
+            type,
+            payload,
+            receiverUsername,
+            senderUsername: userData.username,
+            createdAt: new Date().getTime(),     
+            nonce: uuidv4()   
+        };
+    }
+    else {
+        throw new Error(ErrorType.UserNotFound);
+    }
+}
+
+function cleanMessage(message: StoredMessage | SecurePayloadMessage | PayloadMessage): PayloadMessage {
     return {
         payload: message.payload,
         type: message.type, 
@@ -228,13 +248,27 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         // store group details in database
         await Database.groups.add(JSON.parse(message.payload));
     }
+    else if (message.type === MessageType.ConnectToBlockCreator) {
+        // TODO: add to list of connections to forward the created blocks to
+        // TODO: if currently not block creator, reply with true block creator username
+        // TODO: if X blocks are created, send a message to the list of conns saying so, so that they can shift block creator & empty list
+        // TODO: in case blocks are not able to be sent to a particular member after 3 tries, pop them from the list of connections
+        // TODO: if list of connections are empty and some of the X blocks are still left, it means that you are offline, so handle accordingly
+        // TODO: if no msgs, send message saying no msg so that connection is still established
+    }
+    else if (message.type === MessageType.AskForBlockCreator) {
+        // TODO: check if you know block creator
+
+    }
 
     if (message.secure) {
-        // send acknowledgement
-        addLog(`Sending acknowledgement to sender.`, uuid, 'Receiving Message', LogType.Info, 1);
+        // send acknowledgement / reply
+        addLog(`Sending acknowledgement / reply to sender.`, uuid, 'Receiving Message', LogType.Info, 1);
         dataConnection.send({
             type: MessageType.Acknowledgment,
-            payload: message.createdAt
+            payload: {
+                createdAt: message.createdAt
+            }
         });
     }
 }
@@ -282,7 +316,7 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
     });    
 }
 
-export function sendMessage(message: StoredMessage, logId?: string): Promise<boolean> {
+export function sendMessage(message: StoredMessage | PayloadMessage, logId?: string): Promise<boolean> {
     return new Promise<boolean>(async (resolve, reject) => {
         try {
             if (logId) {
@@ -305,17 +339,21 @@ export function sendMessage(message: StoredMessage, logId?: string): Promise<boo
                 addLog(`Message sent, waiting for acknowledgement.`, logId, 'Sending Message');
             }
 
-            connection.on('data', data => {
+            var replyHandler = (data: PayloadMessage) => {
                 // check for acknowledgement
-                if (message.createdAt === data.payload) {
+                if (message.createdAt === data.payload.createdAt) {
                     if (data.type === MessageType.Acknowledgment) {
                         resolve(true);
                     }
                     else if (data.type === MessageType.AlreadyReceived) {
                         resolve(true);
                     }
-                }                
-            });            
+
+                    connection.off('data', replyHandler, true);
+                }  
+            }
+
+            connection.on('data', replyHandler);                      
 
             // message timeout
             setTimeout(() => reject(ErrorType.MessageTimeout), Globals.messageTimeoutDuration);   
