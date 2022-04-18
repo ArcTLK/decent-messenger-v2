@@ -1,7 +1,6 @@
 import Peer, { DataConnection } from "peerjs";
 import { Globals } from "../Constants";
 import { connectToPeerServer, getPeerDataFromUsername } from "./Peer";
-
 export default class PeerBank {
     peers: {
         [username: string]: {
@@ -157,5 +156,3 @@ export default class PeerBank {
         }
     }
 }
-
-export const peerBank = new PeerBank();

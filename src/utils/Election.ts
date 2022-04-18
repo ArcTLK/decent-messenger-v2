@@ -8,17 +8,17 @@ import { addLog } from "../models/Log";
 import PayloadMessage from "../models/message/PayloadMessage";
 import User from "../models/User";
 import { createPayloadMessage, sendMessage } from "./Peer";
-import { peerBank } from "./PeerBank";
+import { SimpleObjectStore } from "./Store";
 
 export async function connectToGroup(group: Group): Promise<DataConnection> {
 
 
     
-    return await peerBank.getDataConnectionForUsername('x');
+    return await SimpleObjectStore.peerBank.getDataConnectionForUsername('x');
 }
 
 export async function connectToBlockCreator(username: string): Promise<DataConnection> {
-    const connection = await peerBank.getDataConnectionForUsername(username);
+    const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(username);
 
     // TODO: shift block creator in list on connection close
 

@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useState } from 'react';
 import Reducer from './utils/Reducer';
 import { ReactComponent as Logo } from './logo.svg';
-import { Context, initialState } from './utils/Store';
+import { Context, initialState, SimpleObjectStore } from './utils/Store';
 import { ApiClient } from './utils/ApiClient';
 import { connectToPeerServer, listenForMessages } from './utils/Peer';
 import { Globals } from './Constants';
@@ -16,6 +16,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import LogType from "./enums/LogType";
 import { addLog } from './models/Log';
 import { IndexableType } from 'dexie';
+import { GroupManager } from './utils/GroupManager';
 
 const themeLight = createTheme({
 	palette: {
@@ -74,6 +75,8 @@ function App() {
 		await Database.logs.bulkDelete(oldLogs.map(x => x.id!));
     }, []);
 
+
+	/* App initialization */
 	useEffect(() => {
 		// check if user object exists
 		Database.app.get('user').then(data => {
@@ -92,7 +95,23 @@ function App() {
 				addLog('No User data exists in local DB.', '0', 'Initialization');
 			}
 		});
+
+		// terminate existing group managers then repopulate group managers
+		Promise.all(SimpleObjectStore.groupManagers.map(async groupManager => await groupManager.terminate()))
+			.then(() => {
+				SimpleObjectStore.groupManagers = [];
+				Database.groups.toArray().then(groups => {
+					groups.forEach(group => {
+						const groupManager = new GroupManager(group);
+						SimpleObjectStore.groupManagers.push(groupManager);
+						groupManager.connect();
+					});
+				});
+			});
 	}, []);
+
+
+
 
 	const onSubmitRegistrationForm = () => {
 		addLog('Creating User', '0', 'Initialization');
