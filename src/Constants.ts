@@ -10,7 +10,8 @@ export const Globals = {
     },
     messageRetryInterval: 3000,
     maxPeerConnections: 50,
-    maxRetries: 3,
+    maxRetries: 5,
     messageTimeoutDuration: 2500,
-    maxErrorsBeforeTermination: 5
+    maxErrorsBeforeTermination: 5,
+    blockInterval: 5000
 }

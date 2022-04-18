@@ -70,8 +70,6 @@ export default class MessageQueue {
                         addLog(`Received acknowledgement, marking message as sent.`, key, 'Sending Message', LogType.Info, 1);
                     }).catch(error => {
                         addLog(error, key, 'Sending Message', LogType.Error, 1);
-                    }).finally(() => {
-                        SimpleObjectStore.peerBank.releaseUsage(item.receiverUsername);
                     });
                 }
             }

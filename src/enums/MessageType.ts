@@ -7,7 +7,9 @@ enum MessageType {
     CreateGroup = 'Create Group',
     AddBlock = 'Add Block',
     ConnectToBlockCreator = 'Connect to block creator',
-    AskForBlockCreator = 'Ask for block creator'
+    AskForBlockCreator = 'Ask for block creator',
+    Answer = 'Answer',
+    Heartbeat = 'Heartbeat'
 }
 
 

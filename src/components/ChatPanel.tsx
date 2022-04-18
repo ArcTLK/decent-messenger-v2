@@ -16,6 +16,7 @@ import PayloadMessage from '../models/message/PayloadMessage';
 import MessageType from '../enums/MessageType';
 import ChatType from '../enums/ChatType';
 import { createPayloadMessage } from '../utils/Peer';
+import Contact from '../models/Contact';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -25,15 +26,20 @@ const ChatPanel = () => {
     const messagesEndRef = useRef<null | HTMLElement>(null);
 
     const messages = useLiveQuery(async () => {
-        // @ArcTLK modify below for group messages
-        return await Database
-            .messages
-            .where('receiverUsername')
-            .equals(state.currentOpenedChat.data.username ?? '')
-            .or('senderUsername')
-            .equals(state.currentOpenedChat.data.username ?? '')
-            .and(x => x.type === MessageType.Text)
-            .sortBy('createdAt');
+        if (state.currentOpenedChat.type === ChatType.Private) {
+            return await Database
+                .messages
+                .where('receiverUsername')
+                .equals((state.currentOpenedChat.data as Contact).username ?? '')
+                .or('senderUsername')
+                .equals((state.currentOpenedChat.data as Contact).username ?? '')
+                .and(x => x.type === MessageType.Text)
+                .sortBy('createdAt');
+        }
+        else {
+            // TODO: show group messages
+            return [];
+        }        
     }, [state.currentOpenedChat]);
 
     useEffect(() => {
@@ -44,14 +50,16 @@ const ChatPanel = () => {
     }, [state.currentOpenedChat, messages]);
 
     const onSendMessageButtonClick = async () => {
-        // Construct message object
+        if (state.currentOpenedChat.type === ChatType.Private) {
+            const message = await createPayloadMessage(typedMessage, MessageType.Text, (state.currentOpenedChat.data as Contact).username);
 
-        // @ArcTLK - Modify below for group msgs
-        const message = await createPayloadMessage(typedMessage, MessageType.Text, state.currentOpenedChat.data.username);
-
-        // add to message queue
-        addLog('Adding message to Queue', message.createdAt + '-1', 'Sending Message');
-        messageQueue.addMessage(message);
+            // add to message queue
+            addLog('Adding message to Queue', message.createdAt + '-1', 'Sending Message');
+            messageQueue.addMessage(message);
+        }        
+        else {
+            // TODO: send group message
+        }        
 
         setTypedMessage('');
     }
@@ -73,7 +81,7 @@ const ChatPanel = () => {
             
                 {/* ChatPanel Header */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2, bgcolor: 'primary.main' }}>
-                    <Avatar src={`https://avatars.dicebear.com/api/human/${(state.currentOpenedChat.type == ChatType.Private)? state.currentOpenedChat.data.username : state.currentOpenedChat.data.name}.svg`} />
+                    <Avatar src={`https://avatars.dicebear.com/api/human/${(state.currentOpenedChat.type == ChatType.Private)? (state.currentOpenedChat.data as Contact).username : state.currentOpenedChat.data.name}.svg`} />
                     <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentOpenedChat.data.name}</Typography>
                 </Box>
 

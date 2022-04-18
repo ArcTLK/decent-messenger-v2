@@ -15,8 +15,9 @@ import SnackbarElement from './components/SnackbarElement';
 import { useLiveQuery } from 'dexie-react-hooks';
 import LogType from "./enums/LogType";
 import { addLog } from './models/Log';
-import { IndexableType } from 'dexie';
+import { IndexableType, liveQuery } from 'dexie';
 import { GroupManager } from './utils/GroupManager';
+import User from './models/User';
 
 const themeLight = createTheme({
 	palette: {
@@ -41,77 +42,50 @@ function App() {
 	const [registeringUsername, setRegisteringUsername] = useState('');
 	const [registeringName, setRegisteringName] = useState('');
 
-	// db based console logging
-	useLiveQuery(async () => {
-        let doneLogs = await Database
-            .logs
-			.where({ done: 1 })
-			.toArray();	
-		
-		const shownLogs: IndexableType[] = [];
-
-		for (let log of doneLogs) {
-			const logs = await Database.logs.where({ groupId: log.groupId }).sortBy('timestamp');
-			console.group(log.groupName);
-
-			for (let logItem of logs) {
-				if (logItem.type === LogType.Info) {
-					console.log(logItem.text);
-				}
-				else if (logItem.type === LogType.Warn) {
-					console.warn(logItem.text);
-				}
-				else if (logItem.type === LogType.Error) {
-					console.error(logItem.text);
-				}
-				shownLogs.push(logItem.id!);
-			}
-			console.groupEnd();
-		}
-
-		await Database.logs.bulkDelete(shownLogs);
-		// delete old logs
-		const oldLogs = await Database.logs.where('timestamp').belowOrEqual(new Date().getTime() - 1800000).toArray();
-		await Database.logs.bulkDelete(oldLogs.map(x => x.id!));
-    }, []);
-
-
 	/* App initialization */
 	useEffect(() => {
-		// check if user object exists
-		Database.app.get('user').then(data => {
-			if (data) {
-				const user = JSON.parse(data.payload);
-
+		// load user data
+		const userSubscription = liveQuery(() => Database.app.get('user')).subscribe(async rawUserData => {
+			if (rawUserData) {
+				const userData: User = JSON.parse(rawUserData.payload);
 				dispatch({
 					type: 'UpdateUser',
-					payload: user
+					payload: userData
 				});
 	
-				const peer = connectToPeerServer(Globals.api.host, Globals.api.port, user);
-				listenForMessages(peer);
+				if (SimpleObjectStore.peerConnection !== null) {
+					SimpleObjectStore.peerConnection.destroy();			
+				}
+		
+				SimpleObjectStore.peerConnection = connectToPeerServer(Globals.api.host, Globals.api.port, userData);
+				listenForMessages(SimpleObjectStore.peerConnection);
+		
+				SimpleObjectStore.user = userData;
+				
+				// terminate existing group managers then repopulate group managers
+				await Promise.all(SimpleObjectStore.groupManagers.map(async groupManager => await groupManager.terminate()))
+				.then(() => {
+					Database.groups.toArray().then(groups => {
+						SimpleObjectStore.groupManagers = [];
+						groups.forEach(group => {
+							const groupManager = new GroupManager(group);
+							SimpleObjectStore.groupManagers.push(groupManager);
+							groupManager.connect();
+						});
+					});
+				});
+	
+				return userData;
 			}
 			else {
 				addLog('No User data exists in local DB.', '0', 'Initialization');
 			}
 		});
 
-		// terminate existing group managers then repopulate group managers
-		Promise.all(SimpleObjectStore.groupManagers.map(async groupManager => await groupManager.terminate()))
-			.then(() => {
-				SimpleObjectStore.groupManagers = [];
-				Database.groups.toArray().then(groups => {
-					groups.forEach(group => {
-						const groupManager = new GroupManager(group);
-						SimpleObjectStore.groupManagers.push(groupManager);
-						groupManager.connect();
-					});
-				});
-			});
-	}, []);
-
-
-
+		return () => {
+			userSubscription.unsubscribe();
+		}
+	}, []);	
 
 	const onSubmitRegistrationForm = () => {
 		addLog('Creating User', '0', 'Initialization');
@@ -120,11 +94,6 @@ function App() {
 			name: registeringName,
 			username: registeringUsername
 		}).then(({ data }) => {
-			dispatch({
-				type: 'UpdateUser',
-				payload: data
-			});
-
 			Database.app.add({
 				type: 'user',
 				payload: JSON.stringify(data)

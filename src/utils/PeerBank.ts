@@ -5,7 +5,6 @@ export default class PeerBank {
     peers: {
         [username: string]: {
             connection?: DataConnection,
-            inUse: number,
             lastUsed: Date,
             myPeer: Peer,
             peerId: string,
@@ -14,10 +13,22 @@ export default class PeerBank {
     } = {};
     peerCount: number = 0;
 
-    createPeerServerConnectionForUsername(username: string): Promise<void> {
-        return new Promise<void>(async (resolve, reject) => {
+    createPeerServerConnectionForUsername(username: string): Promise<{
+        connection?: DataConnection,
+        lastUsed: Date,
+        myPeer: Peer,
+        peerId: string,
+        errors: number
+    }> {
+        return new Promise<{
+            connection?: DataConnection,
+            lastUsed: Date,
+            myPeer: Peer,
+            peerId: string,
+            errors: number
+        }>(async (resolve, reject) => {
             if (this.peers[username]) {
-                resolve();
+                resolve(this.peers[username]);
             }
             else {
                 // peer connection not found
@@ -49,15 +60,19 @@ export default class PeerBank {
                             this.removeLRU();
                         }
 
+                        if (this.peers[username]) {
+                            // does not exist
+                            ++this.peerCount;
+                        }
+
                         this.peers[username] = {
                             lastUsed: new Date(),
-                            inUse: 0,
                             myPeer: peer,
                             peerId: peerData.peerId,
                             errors: 0
                         }
-                        ++this.peerCount;
-                        resolve();
+
+                        resolve(this.peers[username]);
                     });
                 }                
                 catch (e: any) {
@@ -67,12 +82,22 @@ export default class PeerBank {
         });
     }
 
+    getFreshDataConnectionFromUsername(username: string): Promise<DataConnection> {
+        return new Promise<DataConnection>(async (resolve, reject) => {
+            this.createPeerServerConnectionForUsername(username).then(peerData => {
+                // create a data connection
+                this.createDataConnection(peerData.myPeer, username).then(connection => {
+                    resolve(connection);
+                });
+            });
+        });
+    }
+
     getDataConnectionForUsername(username: string): Promise<DataConnection> {
         return new Promise<DataConnection>(async (resolve, reject) => {
             if (this.peers[username]) {
                 if (this.peers[username].connection) {
                     this.peers[username].lastUsed = new Date();
-                    ++this.peers[username].inUse;
                     resolve(this.peers[username].connection!);
                 }
                 else {
@@ -83,12 +108,7 @@ export default class PeerBank {
                 }
             }
             else {
-                this.createPeerServerConnectionForUsername(username).then(() => {
-                    // create a data connection
-                    this.createDataConnection(this.peers[username].myPeer, username).then(connection => {
-                        resolve(connection);
-                    });
-                });
+                resolve(await this.getFreshDataConnectionFromUsername(username))
             }
         });        
     }
@@ -100,7 +120,6 @@ export default class PeerBank {
                 // console.log('Connected to ' + username + ' on a data channel.');
                 this.peers[username].connection = dataConnection;
                 this.peers[username].lastUsed = new Date();
-                this.peers[username].inUse = 1;
                 resolve(dataConnection);
             });
         });
@@ -108,16 +127,11 @@ export default class PeerBank {
     
     // can be used to remove peers in case a peer is offline / inactive
     removePeer(username: string) {
-        // console.log('Removing peer for username ' + username);
+        //console.log('Removing peer for username ' + username);
         if (this.peers[username]) {
-            if (!this.peers[username].inUse) {
-                this.peers[username].myPeer.destroy();
-                delete this.peers[username];
-                --this.peerCount;
-            }   
-            else {
-                throw new Error(`Peer ${this.peers[username].myPeer.id} of user ${username} is currently in use and was asked to be deleted.`);
-            }
+            this.peers[username].myPeer.destroy();
+            delete this.peers[username];
+            --this.peerCount;
         }   
     }
 
@@ -134,15 +148,6 @@ export default class PeerBank {
         if (LRU) {
             console.log('Closing connection with user ' + LRU + ' due to LRU policy.');
             this.removePeer(LRU);
-        }
-    }
-
-    releaseUsage(username: string) {
-        if (this.peers[username].inUse > 0) {
-            this.peers[username].inUse -= 1;
-        }
-        else {
-            console.error('Peer is being over-released for user ' + username);
         }
     }
 

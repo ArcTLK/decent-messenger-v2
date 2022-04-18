@@ -22,17 +22,13 @@ import Group from '../models/Group';
 import { SimpleObjectStore } from './Store';
 
 // helper functions
-export async function createPayloadMessage(payload: any, type: MessageType, receiverUsername: string): Promise<PayloadMessage> {
-    const user = await Database.app.get('user');
-
-    if (user) {
-        const userData = JSON.parse(user.payload);
-
+export async function createPayloadMessage(payload: string, type: MessageType, receiverUsername: string): Promise<PayloadMessage> {
+    if (SimpleObjectStore.user) {
         return {
             type,
             payload,
             receiverUsername,
-            senderUsername: userData.username,
+            senderUsername: SimpleObjectStore.user.username,
             createdAt: new Date().getTime(),     
             nonce: uuidv4()   
         };
@@ -153,9 +149,33 @@ export function connectToPeerServer(host: string, port: number, updatePeerServer
     return peer;
 }
 
+export function isPeerOnline(username: string): Promise<boolean> {
+    return new Promise<boolean>(async (resolve, reject) => {
+        const connection = await SimpleObjectStore.peerBank.getFreshDataConnectionFromUsername(username);
+
+        connection.send({
+            type: MessageType.Heartbeat,
+            payload: 'Hi!'
+        });
+
+        const onData = (data: any) => {
+            if (data.type === MessageType.Acknowledgment) {
+                resolve(true);
+            }
+        }
+
+        connection.on('data', onData);
+
+        setTimeout(() => {
+            connection.off('data', onData);
+            resolve(false);
+        }, Globals.messageTimeoutDuration);
+    });
+}
+
 export function listenForMessages(peer: Peer) {
     peer.on('connection', dataConnection => {
-        //console.log(`${dataConnection.peer} created a data channel connection to us.`);
+        // console.log(`${dataConnection.peer} created a data channel connection to us.`);
         dataConnection.on('data', (message: SecurePayloadMessage) => {
             handleReceivedMessage(message, dataConnection);
         });
@@ -166,6 +186,9 @@ export function listenForMessages(peer: Peer) {
 async function handleReceivedMessage(message: SecurePayloadMessage, dataConnection: DataConnection) {
     // handle secured payload
     const uuid = v4();
+    let responsePayload: any = {};
+    let responseType: MessageType = MessageType.Acknowledgment;
+
     if (message.secure) {        
         addLog(`Received an encrypted payload: ${message.encryptedPayload.ciphertext} from ${message.senderUsername}`, uuid, 'Receiving Message');
 
@@ -206,7 +229,7 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
             addLog(`Nonce was duplicate, informing sender.`, uuid, 'Receiving Message', LogType.Warn, 1);
             dataConnection.send({
                 type: MessageType.AlreadyReceived,
-                payload: message.nonce
+                payload: await encryptPayload(JSON.stringify({ nonce: message.nonce }), contact.publicKey)
             });
 
             return;
@@ -214,6 +237,8 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         
         addLog(`Nonce is unique.`, uuid, 'Receiving Message');
         await Database.messages.add(cleanMessage(message) as StoredMessage);
+
+        responsePayload.nonce = message.nonce;
     }
 
     if (message.type === MessageType.KeyExchange) {
@@ -258,17 +283,40 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
     }
     else if (message.type === MessageType.AskForBlockCreator) {
         // check if you know block creator
-        console.log(message.payload);
+        const group = JSON.parse(message.payload).group;
+        const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === group.name && x.group.createdAt === group.createdAt);
+
+        responseType = MessageType.Answer;
+        if (!groupManager || groupManager.roundRobinIndex === undefined) {
+            // we also dont know who the block creator is            
+            responsePayload.blockCreator = null;
+        }
+        else {
+            responsePayload.blockCreator = groupManager.roundRobinIndex;
+        }
+    }
+    else if (message.type === MessageType.Heartbeat) {
+        dataConnection.send({
+            type: MessageType.Acknowledgment,
+            payload: 'Hello!'
+        });
     }
 
     if (message.secure) {
         // send acknowledgement / reply
         addLog(`Sending acknowledgement / reply to sender.`, uuid, 'Receiving Message', LogType.Info, 1);
+        
+        // secure this as well
+        const contact = await Database.contacts.get({ username: message.senderUsername });
+        if (!contact) {
+            throw new Error(ErrorType.RSAKeyExchangeNotDone);
+        }
+
+        const encryptedPayload = await encryptPayload(JSON.stringify(responsePayload), contact.publicKey);
+
         dataConnection.send({
-            type: MessageType.Acknowledgment,
-            payload: {
-                createdAt: message.createdAt
-            }
+            type: responseType,
+            payload: encryptedPayload
         });
     }
 }
@@ -316,15 +364,15 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
     });    
 }
 
-export function sendMessage(message: StoredMessage | PayloadMessage, logId?: string): Promise<boolean> {
+export function sendMessage(message: StoredMessage | PayloadMessage, logId?: string): Promise<any> {
     return new Promise<boolean>(async (resolve, reject) => {
         try {
             if (logId) {
                 addLog(`Opening a data channel to ${message.receiverUsername}`, logId, 'Sending Message');
             }
             
-            const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(message.receiverUsername);
-            
+            const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(message.receiverUsername);                
+
             // secure message
             const securedMessage = await secureMessage(cleanMessage(message));
 
@@ -334,33 +382,45 @@ export function sendMessage(message: StoredMessage | PayloadMessage, logId?: str
             }
 
             connection.send(securedMessage);
-
+            
             if (logId) {
                 addLog(`Message sent, waiting for acknowledgement.`, logId, 'Sending Message');
-            }
+            }           
 
-            var replyHandler = (data: PayloadMessage) => {
-                // check for acknowledgement
-                if (message.createdAt === data.payload.createdAt) {
-                    if (data.type === MessageType.Acknowledgment) {
-                        resolve(true);
-                    }
-                    else if (data.type === MessageType.AlreadyReceived) {
-                        resolve(true);
-                    }
+            var replyHandler = async (data: PayloadMessage) => {
+                // decrypt
+                data.payload = JSON.parse(await decryptPayload(data.payload));                
+                
+                // this would contain the acknowledgement / reply
+                if (message.nonce === data.payload.nonce) {
+                    // resolve with response payload
+                    resolve(data.payload);
 
-                    connection.off('data', replyHandler, true);
+                    connection.off('data', replyHandler);
                 }  
             }
 
-            connection.on('data', replyHandler);                      
+            var errorHandler = (e: any) => {
+                if (e.message.indexOf('Connection is not open') !== -1) {
+                    // connection was broken off, reset connection
+                    SimpleObjectStore.peerBank.removePeer(message.receiverUsername);
+                }
+
+                SimpleObjectStore.peerBank.reportError(message.receiverUsername);
+                console.error(e);
+            }
+
+            connection.on('data', replyHandler);             
+            connection.on('error', errorHandler);
 
             // message timeout
-            setTimeout(() => reject(ErrorType.MessageTimeout), Globals.messageTimeoutDuration);   
+            setTimeout(() => {
+                reject(ErrorType.MessageTimeout);
+                connection.off('error', errorHandler);
+            }, Globals.messageTimeoutDuration);   
         }
         catch (e: any) {
-            reject(false);
-            throw e;
+            reject(e);
         }
     });
 }

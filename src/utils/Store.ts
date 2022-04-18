@@ -8,6 +8,7 @@ import Action from '../models/Action';
 import { Dispatch } from 'react';
 import PeerBank from './PeerBank';
 import { GroupManager } from './GroupManager';
+import Peer from 'peerjs';
 
 interface ContextStore {
     state: ContextModel,
@@ -27,7 +28,9 @@ export let initialState: ContextModel = {
 
 export const SimpleObjectStore = {
     peerBank: new PeerBank(),
-    groupManagers: <GroupManager[]>[]
+    groupManagers: <GroupManager[]>[],
+    user: null as User | null,
+    peerConnection: null as Peer | null
 };
 
 export const Context = createContext<ContextStore>({

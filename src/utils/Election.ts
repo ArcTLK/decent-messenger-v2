@@ -1,36 +1,31 @@
 import { DataConnection } from "peerjs";
 import { v4 } from "uuid";
-import LogType from "../enums/LogType";
+import { Globals } from "../Constants";
 import MessageType from "../enums/MessageType";
 import Contact from "../models/Contact";
 import Group from "../models/Group";
 import { addLog } from "../models/Log";
-import PayloadMessage from "../models/message/PayloadMessage";
-import User from "../models/User";
+import { GroupManager } from "./GroupManager";
 import { createPayloadMessage, sendMessage } from "./Peer";
 import { SimpleObjectStore } from "./Store";
 
-export async function connectToGroup(group: Group): Promise<DataConnection> {
-
-
-    
-    return await SimpleObjectStore.peerBank.getDataConnectionForUsername('x');
-}
-
-export async function connectToBlockCreator(username: string): Promise<DataConnection> {
+export async function connectToBlockCreator(groupManager: GroupManager, username: string): Promise<DataConnection> {
     const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(username);
-
-    // TODO: shift block creator in list on connection close
-
+    
     let timer = new Date().getTime();
 
-    setTimeout(() => {
-        // 10 mins make a constant
-        if (new Date().getTime() - 600 > timer) {
+    var interval = setInterval(() => {
+        if (new Date().getTime() - Globals.blockInterval * 2 > timer) {
             // its been so long without a block, probably went offline - close connection
-            connection.close();
+            cleanVariables();
         }
-    });
+    }, Globals.blockInterval);
+
+    function cleanVariables() {
+        clearInterval(interval);
+        groupManager.shiftBlockCreator();
+        SimpleObjectStore.peerBank.removePeer(username);
+    }
 
     connection.on('data', data => {
         // receive block data
@@ -43,31 +38,46 @@ export async function connectToBlockCreator(username: string): Promise<DataConne
 
     connection.on('error', error => {
         console.error(error);
-        connection.close();
+        cleanVariables();
     });
+
     connection.on('close', () => {
         // connection closed, probably went offline
+        cleanVariables();
     });
 
     return connection;
 }
 
-export async function askForBlockCreator(group: Group, contact: Contact) {
-    const logId = v4();
+export function askForBlockCreator(group: Group, contacts: Contact[]) {
+    return new Promise<number>(async (resolve, reject) => {
+        await Promise.all(contacts.map(async contact => {
+            const logId = v4();
+    
+            addLog(`Asking ${contact.username} for block creator.`, logId, 'Identify Block Creator');
+        
+            const message = await createPayloadMessage(JSON.stringify({
+                group: {
+                    name: group.name,
+                    createdAt: group.createdAt
+                }
+            }), MessageType.AskForBlockCreator, contact.username);
+        
+            try {
+                const result = await sendMessage(message, logId);
+                
+                if (result.blockCreator !== null) {
+                    resolve(result.blockCreator);
+                }
+            }   
+            catch (e) {
+                // ignore errors - contact maybe offline
+                console.error(e);
+            }
+        }));
 
-    addLog(`Asking ${contact.username} for block creator.`, logId, 'Identify Block Creator');
-
-    const message = await createPayloadMessage({
-        group: {
-            name: group.name,
-            createdAt: group.createdAt
-        }
-    }, MessageType.AskForBlockCreator, contact.username);
-
-    const result = await sendMessage(message, logId);
-    // TODO: check who is block creator by asking a random online group member
-    // TODO: if no reply / none online assume yourself as block creator
-
+        resolve(-1);
+    });
 }
 
 export async function askForBlocks(connection: DataConnection, startFrom: number) {
