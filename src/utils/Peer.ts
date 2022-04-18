@@ -16,10 +16,10 @@ import LogType from '../enums/LogType';
 import StoredMessage from '../models/message/StoredMessage';
 import PayloadMessage from '../models/message/PayloadMessage';
 import SecurePayloadMessage from '../models/message/SecurePayloadMessage';
-import { peerBank } from './PeerBank';
 import { messageQueue } from './MessageQueue';
 import Contact from '../models/Contact';
 import Group from '../models/Group';
+import { SimpleObjectStore } from './Store';
 
 // helper functions
 export async function createPayloadMessage(payload: any, type: MessageType, receiverUsername: string): Promise<PayloadMessage> {
@@ -257,8 +257,8 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         // TODO: if no msgs, send message saying no msg so that connection is still established
     }
     else if (message.type === MessageType.AskForBlockCreator) {
-        // TODO: check if you know block creator
-
+        // check if you know block creator
+        console.log(message.payload);
     }
 
     if (message.secure) {
@@ -279,7 +279,7 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
             Database.app.get('rsa-keystore').then(async data => {
                 if (data) {
                     const keys = JSON.parse(data.payload);
-                    const connection = await peerBank.getDataConnectionForUsername(theirUsername);
+                    const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(theirUsername);
 
                     if (logId) {
                         addLog('Sending my RSA public key to ' + theirUsername, logId, 'Adding Contact (Sender)');
@@ -323,7 +323,7 @@ export function sendMessage(message: StoredMessage | PayloadMessage, logId?: str
                 addLog(`Opening a data channel to ${message.receiverUsername}`, logId, 'Sending Message');
             }
             
-            const connection = await peerBank.getDataConnectionForUsername(message.receiverUsername);
+            const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(message.receiverUsername);
             
             // secure message
             const securedMessage = await secureMessage(cleanMessage(message));

@@ -5,6 +5,8 @@ import SnackbarState from "../models/SnackbarState";
 import ContextModel from '../models/ContextModel';
 import Action from '../models/Action';
 import { Dispatch } from 'react';
+import PeerBank from './PeerBank';
+import { GroupManager } from './GroupManager';
 
 interface ContextStore {
     state: ContextModel,
@@ -20,6 +22,11 @@ export let initialState: ContextModel = {
         message: '',
         autoHideDuration: 6000
     } as SnackbarState
+};
+
+export const SimpleObjectStore = {
+    peerBank: new PeerBank(),
+    groupManagers: <GroupManager[]>[]
 };
 
 export const Context = createContext<ContextStore>({

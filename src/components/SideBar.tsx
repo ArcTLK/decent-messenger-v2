@@ -6,7 +6,7 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import { Button, Checkbox, Dialog, DialogActions, DialogTitle, DialogContent, DialogContentText, Box, TextField, Avatar, IconButton, Divider, List, ListItem, ListSubheader, ListItemButton, ListItemIcon, ListItemAvatar, ListItemText, Typography, Stack } from '@mui/material';
 import Contact from '../models/Contact';
-import { Context } from '../utils/Store';
+import { Context, SimpleObjectStore } from '../utils/Store';
 import { DeleteForever } from '@mui/icons-material';
 import Database from '../utils/Database';
 import { createGroup, doRsaPublicKeyExchange, getPeerDataFromUsername } from '../utils/Peer';
@@ -15,7 +15,6 @@ import ErrorType from '../enums/ErrorType';
 import { addLog } from '../models/Log';
 import { v4 } from 'uuid';
 import LogType from '../enums/LogType';
-import { peerBank } from '../utils/PeerBank';
 import Group from '../models/Group';
 
 const SideBar = () => {
@@ -65,7 +64,7 @@ const SideBar = () => {
                 }
                 else throw new Error(error);
             }).finally(() => {
-                peerBank.releaseUsage(searchUser);
+                SimpleObjectStore.peerBank.releaseUsage(searchUser);
             })
         }).catch(error => {
             alert(error);

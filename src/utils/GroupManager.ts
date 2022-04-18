@@ -30,4 +30,9 @@ export class GroupManager {
 
         }
     }
+
+    async terminate() {
+        // TODO: close all connections
+
+    }
 }

@@ -6,7 +6,7 @@ import { addLog } from '../models/Log';
 import LogType from "../enums/LogType";
 import StoredMessage from "../models/message/StoredMessage";
 import PayloadMessage from "../models/message/PayloadMessage";
-import { peerBank } from "./PeerBank";
+import { SimpleObjectStore } from "./Store";
 export default class MessageQueue {
     messages: StoredMessage[] = [];
     retrying: boolean = false;
@@ -71,7 +71,7 @@ export default class MessageQueue {
                     }).catch(error => {
                         addLog(error, key, 'Sending Message', LogType.Error, 1);
                     }).finally(() => {
-                        peerBank.releaseUsage(item.receiverUsername);
+                        SimpleObjectStore.peerBank.releaseUsage(item.receiverUsername);
                     });
                 }
             }
