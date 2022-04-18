@@ -1,4 +1,4 @@
-interface BlockMessageItem {
+export interface BlockMessageItem {
     senderUsername: string;
     digitalSignature: string;
     createdAt: number;

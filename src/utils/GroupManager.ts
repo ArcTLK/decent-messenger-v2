@@ -1,8 +1,11 @@
 import { DataConnection } from "peerjs";
+import { clearInterval } from "timers";
+import { Globals } from "../Constants";
+import Block, { BlockMessageItem } from "../models/Block";
 import Contact from "../models/Contact";
 import Group from "../models/Group";
 import { askForBlockCreator, connectToBlockCreator } from "./Election";
-import { isPeerOnline } from "./Peer";
+import { isPeerOnline, sendMessage } from "./Peer";
 import { SimpleObjectStore } from "./Store";
 
 export class GroupManager {
@@ -14,6 +17,7 @@ export class GroupManager {
     roundRobinIndex: number;
 
     connections: DataConnection[] = [];
+    messages: BlockMessageItem[] = [];
 
     constructor(group: Group) {
         this.group = group;
@@ -80,8 +84,28 @@ export class GroupManager {
             connectToBlockCreator(this, this.roundRobinList[this.roundRobinIndex].username);
         }
         else {
-            // TODO: start listening for messages and creating blocks
+            // start listening for messages and creating blocks
+            let blocksCreated = 0;
+            var interval = setInterval(() => {
+                // create block and send them to active connections
+                if (this.messages.length === 0) {
+                    // reply saying no messages to connections
+                    this.connections.forEach(connection => {
+                        // TODO: link connection with contact
+                        // connection.send({
+                        //     type: MessageType.AlreadyReceived,
+                        //     payload: await encryptPayload(JSON.stringify({ nonce: message.nonce }), contact.publicKey)
+                        // });
+                    });
+                }
 
+                blocksCreated += 1;
+                if (blocksCreated > Globals.maxBlocksPerCreator) {
+                    // TODO: shift block creator at connectors end as well
+                    clearInterval(interval);
+                    this.shiftBlockCreator();
+                }
+            }, Globals.blockInterval);
         }
 
         this.connected = true;

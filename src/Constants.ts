@@ -13,5 +13,6 @@ export const Globals = {
     maxRetries: 5,
     messageTimeoutDuration: 2500,
     maxErrorsBeforeTermination: 5,
-    blockInterval: 5000
+    blockInterval: 5000,
+    maxBlocksPerCreator: 24
 }
