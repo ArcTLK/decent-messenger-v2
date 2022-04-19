@@ -86,7 +86,7 @@ async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMess
     return copy;
 }
 
-async function encryptPayload(payload: string, key: JsonWebKey): Promise<{ ciphertext: string, key: Uint8Array }> {
+export async function encryptPayload(payload: string, key: JsonWebKey): Promise<{ ciphertext: string, key: Uint8Array }> {
     const randomAESKey = uuidv4();
     const encryptedAESKey = await rsa.encrypt(new TextEncoder().encode(randomAESKey), key, 'SHA-256');
 
@@ -280,6 +280,23 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         // TODO: in case blocks are not able to be sent to a particular member after 3 tries, pop them from the list of connections
         // TODO: if list of connections are empty and some of the X blocks are still left, it means that you are offline, so handle accordingly
         // TODO: if no msgs, send message saying no msg so that connection is still established
+
+        const group = JSON.parse(message.payload).group;
+        const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === group.name && x.group.createdAt === group.createdAt);
+        responseType = MessageType.Answer;
+        if (!groupManager || groupManager.roundRobinIndex === undefined) {
+            // we also dont know who the block creator is            
+            responsePayload.blockCreator = null;
+        }
+        else if (groupManager.roundRobinIndex !== groupManager.roundRobinList.findIndex(x => x.username === SimpleObjectStore.user?.username)) { 
+            // its not me, its someone else
+            responsePayload.blockCreator = groupManager.roundRobinIndex;
+        }
+        else {
+            // its me
+            groupManager.connections.push(dataConnection);
+            responsePayload.blockCreator = groupManager.roundRobinIndex;
+        }        
     }
     else if (message.type === MessageType.AskForBlockCreator) {
         // check if you know block creator
@@ -364,14 +381,16 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
     });    
 }
 
-export function sendMessage(message: StoredMessage | PayloadMessage, logId?: string): Promise<any> {
+export function sendMessage(message: StoredMessage | PayloadMessage, logId?: string, connection?: DataConnection): Promise<any> {
     return new Promise<boolean>(async (resolve, reject) => {
         try {
             if (logId) {
                 addLog(`Opening a data channel to ${message.receiverUsername}`, logId, 'Sending Message');
             }
-            
-            const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(message.receiverUsername);                
+
+            if (connection === undefined) {
+                connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(message.receiverUsername);
+            }
 
             // secure message
             const securedMessage = await secureMessage(cleanMessage(message));
@@ -396,7 +415,7 @@ export function sendMessage(message: StoredMessage | PayloadMessage, logId?: str
                     // resolve with response payload
                     resolve(data.payload);
 
-                    connection.off('data', replyHandler);
+                    connection!.off('data', replyHandler);
                 }  
             }
 
@@ -416,7 +435,7 @@ export function sendMessage(message: StoredMessage | PayloadMessage, logId?: str
             // message timeout
             setTimeout(() => {
                 reject(ErrorType.MessageTimeout);
-                connection.off('error', errorHandler);
+                connection!.off('error', errorHandler);
             }, Globals.messageTimeoutDuration);   
         }
         catch (e: any) {

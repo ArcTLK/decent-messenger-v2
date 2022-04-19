@@ -1,11 +1,11 @@
 import { DataConnection } from "peerjs";
-import { clearInterval } from "timers";
 import { Globals } from "../Constants";
+import MessageType from "../enums/MessageType";
 import Block, { BlockMessageItem } from "../models/Block";
 import Contact from "../models/Contact";
 import Group from "../models/Group";
 import { askForBlockCreator, connectToBlockCreator } from "./Election";
-import { isPeerOnline, sendMessage } from "./Peer";
+import { encryptPayload, isPeerOnline, sendMessage } from "./Peer";
 import { SimpleObjectStore } from "./Store";
 
 export class GroupManager {
@@ -89,14 +89,13 @@ export class GroupManager {
             var interval = setInterval(() => {
                 // create block and send them to active connections
                 if (this.messages.length === 0) {
-                    // reply saying no messages to connections
-                    this.connections.forEach(connection => {
-                        // TODO: link connection with contact
-                        // connection.send({
-                        //     type: MessageType.AlreadyReceived,
-                        //     payload: await encryptPayload(JSON.stringify({ nonce: message.nonce }), contact.publicKey)
-                        // });
-                    });
+                    // TODO: reply saying no messages to connections
+                    // this.connections.forEach(async connection => {                        
+                    //     connection.send({
+                    //         type: MessageType.AddBlock,
+                    //         payload: await encryptPayload(JSON.stringify({ block: null }), contact.publicKey)
+                    //     });
+                    // });
                 }
 
                 blocksCreated += 1;

@@ -11,6 +11,7 @@ import { SimpleObjectStore } from "./Store";
 
 export async function connectToBlockCreator(groupManager: GroupManager, username: string): Promise<DataConnection> {
     const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(username);
+    const logId = v4();
     
     let timer = new Date().getTime();
 
@@ -27,14 +28,42 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
         SimpleObjectStore.peerBank.removePeer(username);
     }
 
-    connection.on('data', data => {
-        // receive block data
-        // TODO: call handleReceivedMessage
-        // TODO: if you had sent a message, check if your message is in this block or next 2 subsequent blocks, if not check block creator
-        // if they are the same creator still, show an alert saying that your message was maliciously deleted by them
-        console.log(data);
-        timer = new Date().getTime();
-    });
+    const message = await createPayloadMessage(JSON.stringify({
+        group: {
+            name: groupManager.group.name,
+            createdAt: groupManager.group.createdAt
+        }
+    }), MessageType.ConnectToBlockCreator, username);
+
+    try {
+        const result = await sendMessage(message, logId, connection);
+
+        console.log(result);
+        
+        
+        if (result.blockCreator === null) {
+            // TODO: hes not block creator and doesnt know who is, trigger the ask process
+
+        }
+        else if (result.blockCreator !== groupManager.roundRobinIndex) {
+            // TODO: someone else is block creator, connect to them instead
+        }
+        else {
+            // they are the block creator
+            connection.on('data', data => {
+                // receive block data
+                // TODO: call handleReceivedMessage
+                // TODO: if you had sent a message, check if your message is in this block or next 2 subsequent blocks, if not check block creator
+                // if they are the same creator still, show an alert saying that your message was maliciously deleted by them
+                console.log(data);
+                timer = new Date().getTime();
+            });
+        }
+    }   
+    catch (e) {
+        // TODO: handle connection error case
+        console.error(e);
+    }    
 
     connection.on('error', error => {
         console.error(error);

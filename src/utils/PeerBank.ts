@@ -1,6 +1,7 @@
 import Peer, { DataConnection } from "peerjs";
 import { Globals } from "../Constants";
 import { connectToPeerServer, getPeerDataFromUsername } from "./Peer";
+import { SimpleObjectStore } from "./Store";
 export default class PeerBank {
     peers: {
         [username: string]: {
@@ -115,7 +116,9 @@ export default class PeerBank {
 
     createDataConnection(peer: Peer, username: string) {
         return new Promise<DataConnection>((resolve, reject) => {
-            const dataConnection = peer.connect(this.peers[username].peerId);                
+            const dataConnection = peer.connect(this.peers[username].peerId, {
+                metadata: { username: SimpleObjectStore.user?.username }
+            });                
             dataConnection.on('open', () => { 
                 // console.log('Connected to ' + username + ' on a data channel.');
                 this.peers[username].connection = dataConnection;
