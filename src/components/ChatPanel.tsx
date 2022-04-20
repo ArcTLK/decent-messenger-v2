@@ -154,7 +154,7 @@ const ChatPanel = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexGrow: 1, overflow: 'auto', p: 2 }}>
                     {messages && messages.map((message, index) => (
                         <Box key={index} alignSelf={(message.senderUsername===state.user.username)? 'flex-end' : 'flex-start'} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, my: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center'}}>
+                            <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center'}}>
                                 <Box order={(message.senderUsername===state.user.username)? 1 : 2}>
                                     <IconButton onClick={() => showMessageInfo(message)} sx={{ color: 'text.secondary' }}>
                                         <InfoOutlinedIcon sx={{ fontSize: 16 }} />
