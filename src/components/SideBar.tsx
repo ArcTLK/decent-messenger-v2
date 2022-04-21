@@ -42,6 +42,19 @@ const SideBar = () => {
     });
 
     const onAddContactButtonClick = () => {
+        if (searchUser === '') {
+            dispatch({
+				type: 'UpdateSnackbar',
+				payload: {
+					isOpen: true,
+					type: 'error',
+					message: 'Please enter a username'
+				}
+			});
+
+            return;
+        }
+
         // Handle Add Contact Here
         const uuid = v4();
         addLog('Fetching Peer Data for ' + searchUser, uuid, 'Adding Contact (Sender)');
