@@ -16,7 +16,7 @@ import StoredMessage from '../models/message/StoredMessage';
 import PayloadMessage from '../models/message/PayloadMessage';
 import MessageType from '../enums/MessageType';
 import ChatType from '../enums/ChatType';
-import { createPayloadMessage } from '../utils/Peer';
+import { secureMessage, cleanMessage, createPayloadMessage, generateSignature } from '../utils/Peer';
 import Contact from '../models/Contact';
 
 const ChatPanel = () => {
@@ -26,14 +26,17 @@ const ChatPanel = () => {
 
     const messagesEndRef = useRef<null | HTMLElement>(null);
 
+    const [metricData, setMetricData] = useState({} as {avgTimeTakenToSendMessage: number, avgRetries: number})
+
     const [isMessageInfoDialogOpen, setMessageInfoDialogOpen] = useState(false);
-    const [messageInfoDialogContent, setMessageInfoDialogContent] = useState({});
+    // const [messageInfoContent, setMessageInfoContent] = useState({} as { message: StoredMessage, signature: Uint8Array});
+    const [messageInfoContent, setMessageInfoContent] = useState({} as StoredMessage);
 
     const namesFromUsernames: { [id: string] : string} = {};
 
     const messages = useLiveQuery(async () => {
         if (state.currentOpenedChat.type === ChatType.Private) {
-            return await Database
+            const msgs = await Database
                 .messages
                 .where('receiverUsername')
                 .equals((state.currentOpenedChat.data as Contact).username ?? '')
@@ -41,6 +44,25 @@ const ChatPanel = () => {
                 .equals((state.currentOpenedChat.data as Contact).username ?? '')
                 .and(x => x.type === MessageType.Text)
                 .sortBy('createdAt');
+            
+            let totalRetries = 0;
+            let avgTimeTakenToSendMessage = 2.5;
+            let count = 0;
+
+            for(const msg of msgs) {
+                // calculate avg. time taken to send a message and avg no. of retries
+                if(msg.senderUsername === state.user.username) {
+                    totalRetries += msg.retries.length;
+                    count++;
+                }
+            }
+
+            setMetricData({
+                avgTimeTakenToSendMessage: avgTimeTakenToSendMessage,
+                avgRetries: (count==0)? 0 : totalRetries / count
+            });
+
+            return msgs;
         }
         else {
             // TODO: show group messages
@@ -83,7 +105,7 @@ const ChatPanel = () => {
             // add to message queue
             addLog('Adding message to Queue', message.createdAt + '-1', 'Sending Message');
             messageQueue.addMessage(message);
-        }        
+        }
         else {
             // TODO: send group message
         }        
@@ -97,7 +119,16 @@ const ChatPanel = () => {
 
     const showMessageInfo = (message: StoredMessage) => {
         // handle message info here
-        setMessageInfoDialogContent(message);
+        // secureMessage(cleanMessage(message)).then(securedMessage => {
+        //     generateSignature(securedMessage).then(signature => {
+        //         setMessageInfoContent({
+        //             message: message,
+        //             signature: signature
+        //         });
+        //         console.log(messageInfoContent);
+        //     });
+        // });
+        setMessageInfoContent(message);
         setMessageInfoDialogOpen(true);
     }
 
@@ -126,15 +157,15 @@ const ChatPanel = () => {
                         {/* add required information */}
                         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                             <Typography variant="caption" color='text.secondary'>Sender Username</Typography>
-                            <Typography variant="body1" color='text.primary'>{(messageInfoDialogContent as StoredMessage).senderUsername}</Typography>
+                            <Typography variant="body1" color='text.primary'>{(messageInfoContent as StoredMessage).senderUsername}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                             <Typography variant="caption" color='text.secondary'>Created At</Typography>
-                            <Typography variant="body1" color='text.primary'>{(messageInfoDialogContent as StoredMessage).createdAt}</Typography>
+                            <Typography variant="body1" color='text.primary'>{new Date((messageInfoContent as StoredMessage).createdAt).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                             <Typography variant="caption" color='text.secondary'>Nonce</Typography>
-                            <Typography variant="body1" color='text.primary'>{(messageInfoDialogContent as StoredMessage).nonce}</Typography>
+                            <Typography variant="body1" color='text.primary'>{(messageInfoContent as StoredMessage).nonce}</Typography>
                         </Box>
                     </DialogContent>
                     <DialogActions sx={{ my: 1 }}>
@@ -143,10 +174,17 @@ const ChatPanel = () => {
                 </Dialog>
             
                 {/* ChatPanel Header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2, bgcolor: 'primary.main' }}>
-                    <Avatar src={`https://avatars.dicebear.com/api/human/${(state.currentOpenedChat.type == ChatType.Private)? (state.currentOpenedChat.data as Contact).username : state.currentOpenedChat.data.name}.svg`} />
-                    <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentOpenedChat.data.name}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, bgcolor: 'primary.main' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar src={`https://avatars.dicebear.com/api/human/${(state.currentOpenedChat.type == ChatType.Private)? (state.currentOpenedChat.data as Contact).username : state.currentOpenedChat.data.name}.svg`} />
+                        <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentOpenedChat.data.name}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'end' }}>
+                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average time taken to send message: {metricData.avgTimeTakenToSendMessage}</Typography>
+                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average retries: {metricData.avgRetries}</Typography>
+                    </Box>
                 </Box>
+                
 
                 <Divider />
     

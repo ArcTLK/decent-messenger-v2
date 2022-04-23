@@ -38,7 +38,7 @@ export async function createPayloadMessage(payload: string, type: MessageType, r
     }
 }
 
-function cleanMessage(message: StoredMessage | SecurePayloadMessage | PayloadMessage): PayloadMessage {
+export function cleanMessage(message: StoredMessage | SecurePayloadMessage | PayloadMessage): PayloadMessage {
     return {
         payload: message.payload,
         type: message.type, 
@@ -49,7 +49,7 @@ function cleanMessage(message: StoredMessage | SecurePayloadMessage | PayloadMes
     };
 }
 
-async function generateSignature(message: SecurePayloadMessage) {
+export async function generateSignature(message: SecurePayloadMessage) {
     // create digital signature
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
@@ -62,7 +62,7 @@ async function generateSignature(message: SecurePayloadMessage) {
     }
 }
 
-async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMessage> {
+export async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMessage> {
     const copy: SecurePayloadMessage = JSON.parse(JSON.stringify(message));
 
     // create digital signature
