@@ -49,17 +49,21 @@ function cleanMessage(message: StoredMessage | SecurePayloadMessage | PayloadMes
     };
 }
 
-async function generateSignature(message: SecurePayloadMessage) {
-    // create digital signature
+export async function generateSignatureWithoutCleaning(payload: any) {
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
-        const cleanedMessage = cleanMessage(message);
-
-        return await rsa.sign(new TextEncoder().encode(JSON.stringify(cleanedMessage)), JSON.parse(keys.payload).privateKey, 'SHA-256');
+        return await rsa.sign(new TextEncoder().encode(JSON.stringify(payload)), JSON.parse(keys.payload).privateKey, 'SHA-256');
     }
     else {
         throw new Error(ErrorType.RSAKeyStoreNotFound);
     }
+}
+
+async function generateSignature(message: SecurePayloadMessage) {
+    // create digital signature
+    const cleanedMessage = cleanMessage(message);
+
+    return await generateSignatureWithoutCleaning(cleanedMessage);
 }
 
 async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMessage> {
@@ -317,6 +321,9 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
             type: MessageType.Acknowledgment,
             payload: 'Hello!'
         });
+    }
+    else if (message.type === MessageType.GroupMessage) {
+        console.log(message.payload);
     }
 
     if (message.secure) {

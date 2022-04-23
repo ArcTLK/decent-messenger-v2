@@ -11,17 +11,32 @@ import { SimpleObjectStore } from "./Store";
 export class GroupManager {
     connected = false;
     connecting = false;
+    reconnecting = false;
     shifting = false;
     group: Group;
     roundRobinList: Contact[] = [];
     roundRobinIndex: number;
 
+    blockCreatorConnection: DataConnection | null;
     connections: DataConnection[] = [];
     messages: BlockMessageItem[] = [];
+    connectionRetries = 0;
 
     constructor(group: Group) {
         this.group = group;
         this.roundRobinList = this.group.admins.concat(this.group.members);
+    }
+
+    async reconnect() {
+        if (this.reconnecting) {
+            return;
+        }
+        
+        this.reconnecting = true;
+        this.connected = false;
+        this.blockCreatorConnection = null;
+        await this.connect();
+        this.reconnecting = false;
     }
 
     async connect() {
@@ -81,37 +96,59 @@ export class GroupManager {
 
         if (this.roundRobinList[this.roundRobinIndex].username !== SimpleObjectStore.user?.username) {
             // connect to block creator
-            connectToBlockCreator(this, this.roundRobinList[this.roundRobinIndex].username);
+            const connection = await connectToBlockCreator(this, this.roundRobinList[this.roundRobinIndex].username)
+            if (connection === null) {
+                // connection failed, retry connection process
+                this.connected = false;
+                this.connecting = false;
+                if (this.connectionRetries++ < Globals.maxBlockCreatorConnectionRetries) {
+                    await this.connect();
+                }                
+                else {
+                    // become the block creator yourself
+                    this.becomeBlockCreator();
+                }
+            }
+            else {
+                this.blockCreatorConnection = connection;
+            }
         }
         else {
-            // start listening for messages and creating blocks
-            let blocksCreated = 0;
-            var interval = setInterval(() => {
-                // create block and send them to active connections
-                if (this.messages.length === 0) {
-                    // TODO: reply saying no messages to connections
-                    // this.connections.forEach(async connection => {                        
-                    //     connection.send({
-                    //         type: MessageType.AddBlock,
-                    //         payload: await encryptPayload(JSON.stringify({ block: null }), contact.publicKey)
-                    //     });
-                    // });
-                }
-
-                blocksCreated += 1;
-                if (blocksCreated > Globals.maxBlocksPerCreator) {
-                    // TODO: shift block creator at connectors end as well
-                    clearInterval(interval);
-                    this.shiftBlockCreator();
-                }
-            }, Globals.blockInterval);
+            // become the block creator yourself
+            this.becomeBlockCreator();
         }
 
         this.connected = true;
         this.connecting = false;
     }
 
-    shiftBlockCreator() {        
+    becomeBlockCreator() {
+        // start listening for messages and creating blocks
+        let blocksCreated = 0;
+        var interval = setInterval(() => {
+            // create block and send them to active connections
+            if (this.messages.length === 0) {
+                // TODO: reply saying no messages to connections
+                // this.connections.forEach(async connection => {                        
+                //     connection.send({
+                //         type: MessageType.AddBlock,
+                //         payload: await encryptPayload(JSON.stringify({ block: null }), contact.publicKey)
+                //     });
+                // });
+            }
+
+            blocksCreated += 1;
+            if (blocksCreated > Globals.maxBlocksPerCreator) {
+                // TODO: shift block creator at connectors end as well
+                // clearInterval(interval);
+                // this.shiftBlockCreator();
+            }
+        }, Globals.blockInterval);
+    }
+
+    shiftBlockCreator() {   
+        return; // disable for now
+
         this.connected = false;
 
         if (this.shifting) {

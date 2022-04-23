@@ -7,7 +7,7 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MessageStatus from '../enums/MessageStatus';
-import { Context } from '../utils/Store';
+import { Context, SimpleObjectStore } from '../utils/Store';
 import { messageQueue } from '../utils/MessageQueue';
 import Database from '../utils/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -16,8 +16,11 @@ import StoredMessage from '../models/message/StoredMessage';
 import PayloadMessage from '../models/message/PayloadMessage';
 import MessageType from '../enums/MessageType';
 import ChatType from '../enums/ChatType';
-import { createPayloadMessage } from '../utils/Peer';
+import { createPayloadMessage, generateSignatureWithoutCleaning, sendMessage } from '../utils/Peer';
 import Contact from '../models/Contact';
+import { BlockMessageItem } from '../models/Block';
+import Group from '../models/Group';
+import { Buffer } from 'buffer';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -85,7 +88,51 @@ const ChatPanel = () => {
             messageQueue.addMessage(message);
         }        
         else {
-            // TODO: send group message
+            // send group message
+            const unsignedBlockItem = {
+                senderUsername: SimpleObjectStore.user!.username,
+                createdAt: new Date().getTime(),
+                message: typedMessage
+            };
+            const signature = await generateSignatureWithoutCleaning(unsignedBlockItem);
+
+            const payload: BlockMessageItem = {
+                ...unsignedBlockItem,
+                digitalSignature: Buffer.from(signature).toString('base64')
+            };
+            
+            const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === state.currentOpenedChat.data.name && x.group.createdAt === (state.currentOpenedChat.data as Group).createdAt);
+
+            if (groupManager) {
+                if (groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username) {
+                    // TODO: you are the block creator, so simply add the message to the block
+                }
+                else {
+                    const tellBlockCreatorToAddMessage = async () => {
+                        const connection = groupManager.blockCreatorConnection!;
+                        const message = await createPayloadMessage(JSON.stringify(payload), MessageType.GroupMessage, groupManager.roundRobinList[groupManager.roundRobinIndex].username);
+
+                        sendMessage(message, uuidv4(), connection);
+                    }
+                    
+                    // get block creator connection and use that to send the msg
+                    if (groupManager.blockCreatorConnection === null) {
+                        console.error('Not connected to block creator, reconnecting!');
+                        groupManager.reconnect().then(() => {
+                            tellBlockCreatorToAddMessage();
+                        });
+                    }
+                    else {
+                        tellBlockCreatorToAddMessage();
+                    }
+                }
+            }
+            
+            //const message = await createPayloadMessage(JSON.stringify(payload), MessageType.GroupMessage, (state.currentOpenedChat.data as Contact).username);
+
+            // // add to message queue
+            // addLog('Adding message to Queue', message.createdAt + '-1', 'Sending Message');
+            // messageQueue.addMessage(message);
         }        
 
         setTypedMessage('');

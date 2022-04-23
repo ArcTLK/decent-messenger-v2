@@ -9,7 +9,7 @@ import { GroupManager } from "./GroupManager";
 import { createPayloadMessage, sendMessage } from "./Peer";
 import { SimpleObjectStore } from "./Store";
 
-export async function connectToBlockCreator(groupManager: GroupManager, username: string): Promise<DataConnection> {
+export async function connectToBlockCreator(groupManager: GroupManager, username: string): Promise<DataConnection | null> {
     const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(username);
     const logId = v4();
     
@@ -18,13 +18,15 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
     var interval = setInterval(() => {
         if (new Date().getTime() - Globals.blockInterval * 2 > timer) {
             // its been so long without a block, probably went offline - close connection
-            cleanVariables();
+            // TODO: uncomment this later on
+            //cleanVariables();
         }
     }, Globals.blockInterval);
 
     function cleanVariables() {
         clearInterval(interval);
-        groupManager.shiftBlockCreator();
+        // groupManager.shiftBlockCreator();
+        groupManager.reconnect();
         SimpleObjectStore.peerBank.removePeer(username);
     }
 
@@ -42,11 +44,12 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
         
         
         if (result.blockCreator === null) {
-            // TODO: hes not block creator and doesnt know who is, trigger the ask process
-
+            // hes not block creator and doesnt know who is, trigger the ask process
+            return null;
         }
         else if (result.blockCreator !== groupManager.roundRobinIndex) {
-            // TODO: someone else is block creator, connect to them instead
+            // someone else is block creator, connect to them instead
+            return await connectToBlockCreator(groupManager, groupManager.roundRobinList[result.blockCreator].username);
         }
         else {
             // they are the block creator
@@ -63,6 +66,7 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
     catch (e) {
         // TODO: handle connection error case
         console.error(e);
+        return null;
     }    
 
     connection.on('error', error => {
