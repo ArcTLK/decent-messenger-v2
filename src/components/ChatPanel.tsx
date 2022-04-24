@@ -294,10 +294,10 @@ const ChatPanel = () => {
                         <Avatar src={`https://avatars.dicebear.com/api/human/${(state.currentOpenedChat.type == ChatType.Private)? (state.currentOpenedChat.data as Contact).username : state.currentOpenedChat.data.name}.svg`} />
                         <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentOpenedChat.data.name}</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'end' }}>
+                    {state.currentOpenedChat.type == ChatType.Private && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'end' }}>
                         <Typography variant="caption" sx={{ color: '#ccc' }}>Average time taken to send message: {metricData.avgTimeTakenToSendMessage}</Typography>
                         <Typography variant="caption" sx={{ color: '#ccc' }}>Average retries: {metricData.avgRetries}</Typography>
-                    </Box>
+                    </Box>}
                 </Box>
                 
 
