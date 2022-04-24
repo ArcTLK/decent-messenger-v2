@@ -38,7 +38,7 @@ export async function createPayloadMessage(payload: string, type: MessageType, r
     }
 }
 
-function cleanMessage(message: StoredMessage | SecurePayloadMessage | PayloadMessage): PayloadMessage {
+export function cleanMessage(message: StoredMessage | SecurePayloadMessage | PayloadMessage): PayloadMessage {
     return {
         payload: message.payload,
         type: message.type, 
@@ -59,14 +59,14 @@ export async function generateSignatureWithoutCleaning(payload: any) {
     }
 }
 
-async function generateSignature(message: SecurePayloadMessage) {
+export async function generateSignature(message: SecurePayloadMessage) {
     // create digital signature
     const cleanedMessage = cleanMessage(message);
 
     return await generateSignatureWithoutCleaning(cleanedMessage);
 }
 
-async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMessage> {
+export async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMessage> {
     const copy: SecurePayloadMessage = JSON.parse(JSON.stringify(message));
 
     // create digital signature
