@@ -323,7 +323,27 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         });
     }
     else if (message.type === MessageType.GroupMessage) {
-        console.log(message.payload);
+        const payload = JSON.parse(message.payload);
+        const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === payload.group.name && x.group.createdAt === payload.group.createdAt);
+        delete payload.group;
+        
+        if (groupManager) {
+            // check if you are the block creator
+            if (groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username) {
+                // check if message is already in queue
+                if (!groupManager.messages.find(x => x.digitalSignature === payload.digitalSignature)) {
+                    groupManager.messages.push(payload);
+                }
+            }
+            else {
+                // reject
+                responseType = MessageType.IAmNotBlockCreator;
+            }
+        }
+        else {
+            // not my group, reject
+            responseType = MessageType.IAmNotBlockCreator;
+        }
     }
 
     if (message.secure) {

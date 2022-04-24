@@ -18,8 +18,7 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
     var interval = setInterval(() => {
         if (new Date().getTime() - Globals.blockInterval * 2 > timer) {
             // its been so long without a block, probably went offline - close connection
-            // TODO: uncomment this later on
-            //cleanVariables();
+            cleanVariables();
         }
     }, Globals.blockInterval);
 
@@ -38,10 +37,7 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
     }), MessageType.ConnectToBlockCreator, username);
 
     try {
-        const result = await sendMessage(message, logId, connection);
-
-        console.log(result);
-        
+        const result = await sendMessage(message, logId, connection);        
         
         if (result.blockCreator === null) {
             // hes not block creator and doesnt know who is, trigger the ask process

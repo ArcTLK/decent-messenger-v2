@@ -1,3 +1,4 @@
+import { ReplayCircleFilledOutlined } from "@mui/icons-material";
 import { Box, Typography } from "@mui/material";
 import { useContext, useEffect, useState } from "react";
 import Group from "../models/Group";
@@ -8,27 +9,19 @@ const BlockChainDebug = () => {
     const {state, dispatch} = useContext(Context);
 
     const [groupManager, setGroupManager] = useState<GroupManager>();
+    const [refreshState, setRefreshState] = useState<number>(0);
 
     useEffect(() => {
         const gm = SimpleObjectStore.groupManagers.find(x => x.group.name === state.currentOpenedChat.data.name && x.group.createdAt === (state.currentOpenedChat.data as Group).createdAt);
         setGroupManager(gm);
-
-        var interval = setInterval(() => {
-            const gm = SimpleObjectStore.groupManagers.find(x => x.group.name === state.currentOpenedChat.data.name && x.group.createdAt === (state.currentOpenedChat.data as Group).createdAt);
-            setGroupManager(gm);
-        }, 3000);
-
-        return () => {
-            clearInterval(interval);
-        }
-
-    }, [state.currentOpenedChat.data]);   
+    }, [state.currentOpenedChat.data, refreshState]);   
     
 
     return (
         <Box>
-            <Box sx={{ p: 2.5, bgcolor: 'primary.main' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2.5, bgcolor: 'primary.main', gap: 1, alignItems: 'center' }}>
                 <Typography variant="h6" component="div" sx={{ color: 'white' }}>Blockchain Debug View</Typography>
+                <ReplayCircleFilledOutlined sx={{ color: 'white', cursor: 'pointer' }} onClick={() => setRefreshState(refreshState + 1)}></ReplayCircleFilledOutlined>
             </Box>            
             { 
                 groupManager !== undefined && (

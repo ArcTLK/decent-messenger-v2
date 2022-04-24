@@ -1,9 +1,11 @@
 import { DataConnection } from "peerjs";
 import { Globals } from "../Constants";
+import ErrorType from "../enums/ErrorType";
 import MessageType from "../enums/MessageType";
 import Block, { BlockMessageItem } from "../models/Block";
 import Contact from "../models/Contact";
 import Group from "../models/Group";
+import Database from "./Database";
 import { askForBlockCreator, connectToBlockCreator } from "./Election";
 import { encryptPayload, isPeerOnline, sendMessage } from "./Peer";
 import { SimpleObjectStore } from "./Store";
@@ -44,97 +46,122 @@ export class GroupManager {
             return;
         }
 
-        this.connecting = true;
+        try {
+            this.connecting = true;
 
-        // check if already knows block creator
-        if (!this.roundRobinIndex) {
-            // inquire who is currently the block creator from random online member (ask 10 at a time)
-            const randomizedList = this.roundRobinList
-                .map(value => ({ value, sort: Math.random() }))
-                .sort((a, b) => a.sort - b.sort)
-                .map(({ value }) => value);
-            
-            // exclude yourself from list
-            const index = randomizedList.findIndex(x => x.username === SimpleObjectStore.user?.username);
-            if (index !== -1) {
-                randomizedList.splice(index, 1);
-            }            
-
-            let askList = [];
-            let result = -1;
-            
-            for (let contact of randomizedList) {
-                if (askList.length < 10) {
-                    askList.push(contact);
+            setTimeout(() => {
+                // if not connected in 5 secs, set connecting to false - smth probably failed
+                if (!this.connected) {
+                    this.connecting = false;
                 }
-                else {
+            }, 5000);
+
+            // check if already knows block creator
+            if (!this.roundRobinIndex) {
+                // inquire who is currently the block creator from random online member (ask 10 at a time)
+                const randomizedList = this.roundRobinList
+                    .map(value => ({ value, sort: Math.random() }))
+                    .sort((a, b) => a.sort - b.sort)
+                    .map(({ value }) => value);
+                
+                // exclude yourself from list
+                const index = randomizedList.findIndex(x => x.username === SimpleObjectStore.user?.username);
+                if (index !== -1) {
+                    randomizedList.splice(index, 1);
+                }            
+    
+                let askList = [];
+                let result = -1;
+                
+                for (let contact of randomizedList) {
+                    if (askList.length < 10) {
+                        askList.push(contact);
+                    }
+                    else {
+                        result = await askForBlockCreator(this.group, askList);
+                        askList = [];
+    
+                        if (result !== -1) {
+                            // block creator found
+                            break;
+                        }
+                    }                
+                }
+    
+                // ask leftover if not yet found
+                if (askList.length > 0 && result === -1) {
                     result = await askForBlockCreator(this.group, askList);
                     askList = [];
-
-                    if (result !== -1) {
-                        // block creator found
-                        break;
-                    }
-                }                
-            }
-
-            // ask leftover if not yet found
-            if (askList.length > 0 && result === -1) {
-                result = await askForBlockCreator(this.group, askList);
-                askList = [];
-            }
-
-            if (result !== -1) {
-                // block creator found
-                this.roundRobinIndex = result;
-            }
-            else {
-                // make yourself the block creator
-                this.roundRobinIndex = this.roundRobinList.findIndex(x => x.username === SimpleObjectStore.user?.username);
-            }
-        }
-
-        if (this.roundRobinList[this.roundRobinIndex].username !== SimpleObjectStore.user?.username) {
-            // connect to block creator
-            const connection = await connectToBlockCreator(this, this.roundRobinList[this.roundRobinIndex].username)
-            if (connection === null) {
-                // connection failed, retry connection process
-                this.connected = false;
-                this.connecting = false;
-                if (this.connectionRetries++ < Globals.maxBlockCreatorConnectionRetries) {
-                    await this.connect();
-                }                
+                }
+    
+                if (result !== -1) {
+                    // block creator found
+                    this.roundRobinIndex = result;
+                }
                 else {
-                    // become the block creator yourself
-                    this.becomeBlockCreator();
+                    // make yourself the block creator
+                    this.roundRobinIndex = this.roundRobinList.findIndex(x => x.username === SimpleObjectStore.user?.username);
+                }
+            }
+    
+            if (this.roundRobinList[this.roundRobinIndex].username !== SimpleObjectStore.user?.username) {
+                // connect to block creator
+                const connection = await connectToBlockCreator(this, this.roundRobinList[this.roundRobinIndex].username)
+                if (connection === null) {
+                    // connection failed, retry connection process
+                    this.connected = false;
+                    this.connecting = false;
+                    if (this.connectionRetries++ < Globals.maxBlockCreatorConnectionRetries) {
+                        await this.connect();
+                    }                
+                    else {
+                        // become the block creator yourself
+                        await this.becomeBlockCreator();
+                    }
+                }
+                else {
+                    this.blockCreatorConnection = connection;
                 }
             }
             else {
-                this.blockCreatorConnection = connection;
+                // become the block creator yourself
+                await this.becomeBlockCreator();
             }
+    
+            this.connected = true;
+            this.connecting = false;
         }
-        else {
-            // become the block creator yourself
-            this.becomeBlockCreator();
-        }
-
-        this.connected = true;
-        this.connecting = false;
+        catch (e) {
+            console.error(e);
+            this.connecting = false;
+        }        
     }
 
-    becomeBlockCreator() {
+    async becomeBlockCreator() {
         // start listening for messages and creating blocks
         let blocksCreated = 0;
         var interval = setInterval(() => {
             // create block and send them to active connections
-            if (this.messages.length === 0) {
-                // TODO: reply saying no messages to connections
-                // this.connections.forEach(async connection => {                        
-                //     connection.send({
-                //         type: MessageType.AddBlock,
-                //         payload: await encryptPayload(JSON.stringify({ block: null }), contact.publicKey)
-                //     });
-                // });
+            if (this.messages.length === 0 || true) { // TODO: remove or true later
+                // reply saying no messages to connections
+                this.connections.forEach(async connection => {                        
+                    const contact = await Database.contacts.get({
+                        username: connection.metadata.username
+                    });
+                    
+                    if (contact) {
+                        connection.send({
+                            type: MessageType.AddBlock,
+                            payload: await encryptPayload(JSON.stringify({ block: null }), contact.publicKey)
+                        });
+                    }      
+                    else {
+                        console.error(ErrorType.ContactNotFound);
+                    }              
+                });
+            }
+            else {
+
             }
 
             blocksCreated += 1;
