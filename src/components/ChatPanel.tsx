@@ -34,7 +34,7 @@ const ChatPanel = () => {
 
     const namesFromUsernames: { [id: string] : string} = {};
 
-    // TODO: show group messages 
+    // show group messages 
     const group = useLiveQuery(async () => {
         if (state.currentOpenedChat.type === ChatType.Group) {
             return await Database
@@ -48,6 +48,16 @@ const ChatPanel = () => {
             return null;
         }
     }, [state.currentOpenedChat]);
+
+    let groupMessages: BlockMessageItem[] = [];
+    if (group && group.blockchain) {
+        // gather all messages
+        group.blockchain.blocks.forEach(block => {
+            groupMessages.push(...block.messages);
+        });
+        
+        groupMessages.sort((a, b) => a.createdAt - b.createdAt);
+    }
 
     const messages = useLiveQuery(async () => {
         if (state.currentOpenedChat.type === ChatType.Private) {
@@ -70,7 +80,7 @@ const ChatPanel = () => {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
 
-    }, [state.currentOpenedChat, messages]);
+    }, [state.currentOpenedChat, messages, group]);
 
     const onSendMessageButtonClick = async () => {
         if(typedMessage === '') {
@@ -257,6 +267,32 @@ const ChatPanel = () => {
     
                 {/* ChatPanel Messages */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexGrow: 1, overflow: 'auto', p: 2 }}>
+                {group && groupMessages.map((message: BlockMessageItem, index) => (
+                        <Box key={index} alignSelf={(message.senderUsername===state.user.username) ? 'flex-end' : 'flex-start'} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, my: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center'}}>
+                                <Box order={(message.senderUsername===state.user.username)? 2 : 1} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 1.5, borderRadius: 2 }} bgcolor={message.senderUsername===state.user.username? 'primary.main' : 'secondary.light'} >
+                                    {state.currentOpenedChat.type == ChatType.Group && <Box sx={{ display: 'flex', alignItems: 'center'}}>
+                                        {/* Fetch name of user via username below */}
+                                        {/* <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'} sx={{ fontSize: 12 }}>{ namesFromUsernames[message.senderUsername] }</Box> */}
+                                        <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'} sx={{ fontSize: 12 }}>{ message.senderUsername }</Box>
+                                    </Box>}
+
+                                    <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.message}</Box>
+                                </Box>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center', gap: 0.5 }}>
+                                <Box color='text.secondary' sx={{ display: 'flex', alignItems: 'center', fontSize: 12 }}>
+                                    {new Date(message.createdAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </Box>
+
+                                {message.senderUsername===state.user.username && <Box color='text.secondary' sx={{ display: 'flex', alignItems: 'center' }}>
+                                    <DoneIcon sx={{ fontSize: 16 }}/>
+                                </Box>}
+                            </Box>
+                        </Box>
+                    ))}
+
                     {group && group.unsentMessages && group.unsentMessages.map((message: BlockMessageItem, index) => (
                         <Box key={index} alignSelf={(message.senderUsername===state.user.username) ? 'flex-end' : 'flex-start'} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, my: 1 }}>
                             <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center'}}>
@@ -287,6 +323,7 @@ const ChatPanel = () => {
                             </Box>
                         </Box>
                     ))}
+
                     {messages && messages.map((message, index) => (
                         <Box key={index} alignSelf={(message.senderUsername===state.user.username)? 'flex-end' : 'flex-start'} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, my: 1 }}>
                             <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center'}}>

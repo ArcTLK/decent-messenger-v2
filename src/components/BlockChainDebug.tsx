@@ -1,16 +1,17 @@
-import { ArrowLeft, ArrowRight, ReplayCircleFilledOutlined } from "@mui/icons-material";
+import { ArrowLeft, ArrowRight, DeleteForever, ReplayCircleFilledOutlined } from "@mui/icons-material";
 import { Box, Divider, Grid, IconButton, Stack, Typography } from "@mui/material";
 import { useContext, useEffect, useState } from "react";
 import { Globals } from "../Constants";
 import Group from "../models/Group";
+import Blockchain from "../utils/Blockchain";
 import { GroupManager } from "../utils/GroupManager";
 import { Context, SimpleObjectStore } from "../utils/Store";
+import Database from "../utils/Database";
 
 const BlockChainDebug = () => {
     const {state, dispatch} = useContext(Context);
 
     const [groupManager, setGroupManager] = useState<GroupManager>();
-    const [refreshState, setRefreshState] = useState<number>(0);
     const [viewingBlockIndex, setViewingBlockIndex] = useState<number>(-1);
     const [timer, setTimer] = useState<number>(0);
 
@@ -28,20 +29,31 @@ const BlockChainDebug = () => {
         return () => {
             clearTimeout(timeout);
         }
-    }, [state.currentOpenedChat.data, refreshState, timer]);   
+    }, [state.currentOpenedChat.data, timer]);   
+
+    const deleteGroupMessages = () => {
+        const gm = SimpleObjectStore.groupManagers.find(x => x.group.name === state.currentOpenedChat.data.name && x.group.createdAt === (state.currentOpenedChat.data as Group).createdAt);
+        if (gm) {
+            gm.group.blockchain = new Blockchain();
+
+            Database.groups.update(gm.group, {
+                blockchain: gm.group.blockchain
+            });
+        } 
+    }
     
 
     return (
-        <Box>
+        <Box sx={{ maxWidth: '20rem' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2.5, bgcolor: 'primary.main', gap: 1, alignItems: 'center' }}>
                 <Typography variant="h6" component="div" sx={{ color: 'white' }}>Blockchain Debug View</Typography>
-                <ReplayCircleFilledOutlined sx={{ color: 'white', cursor: 'pointer' }} onClick={() => setRefreshState(refreshState + 1)}></ReplayCircleFilledOutlined>
+                <DeleteForever sx={{ color: 'white', cursor: 'pointer' }} onClick={() => deleteGroupMessages()}></DeleteForever>
             </Box>            
             { 
-                groupManager !== undefined && (
+                groupManager != undefined && (
                     <>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ mt: 2 }}>
-                            <IconButton color="primary" disabled={viewingBlockIndex < 0}>
+                            <IconButton color="primary" disabled={viewingBlockIndex <= 0} onClick={() => setViewingBlockIndex(viewingBlockIndex - 1)}>
                                 <ArrowLeft sx={{ fontSize: '2.5rem' }}></ArrowLeft>
                             </IconButton>
                             <Box sx={{ p: 1 }}>
@@ -50,12 +62,18 @@ const BlockChainDebug = () => {
                                         <Typography variant="h6" component="div">No blocks</Typography>
                                     ) : (
                                         <Box>
-
+                                            <Typography variant="h6" component="div">Block #{groupManager.group.blockchain!.blocks[viewingBlockIndex].serial}</Typography>
+                                            <Typography variant="body2" component="div" sx={{wordBreak: 'break-all'}}>Hash: {groupManager.group.blockchain!.blocks[viewingBlockIndex].hash}</Typography>
+                                            <Typography variant="body2" component="div">Timestamp: {groupManager.group.blockchain!.blocks[viewingBlockIndex].timestamp}</Typography>
+                                            <Typography variant="body1" component="div">Messages</Typography>
+                                            {groupManager.group.blockchain!.blocks[viewingBlockIndex].messages.map((message, index) => (
+                                                <Typography variant="body2" component="div" key={index}>{message.senderUsername}: {message.message}</Typography>
+                                            ))}
                                         </Box>
                                     )
                                 }
                             </Box>
-                            <IconButton color="primary" disabled={viewingBlockIndex === -1 || viewingBlockIndex >= groupManager.group.blockchain!.blocks.length - 1}>
+                            <IconButton color="primary" onClick={() => setViewingBlockIndex(viewingBlockIndex + 1)} disabled={viewingBlockIndex === -1 || viewingBlockIndex >= groupManager.group.blockchain!.blocks.length - 1}>
                                 <ArrowRight sx={{ fontSize: '2.5rem' }}></ArrowRight>
                             </IconButton>
                         </Stack>

@@ -100,7 +100,7 @@ export async function encryptPayload(payload: string, key: JsonWebKey): Promise<
     };
 }
 
-async function decryptPayload(data: { ciphertext: string, key: ArrayBuffer }): Promise<string> {
+export async function decryptPayload(data: { ciphertext: string, key: ArrayBuffer }): Promise<string> {
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
         // decrypt AES key
@@ -278,12 +278,9 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         await Database.groups.add(JSON.parse(message.payload));
     }
     else if (message.type === MessageType.ConnectToBlockCreator) {
-        // TODO: add to list of connections to forward the created blocks to
-        // TODO: if currently not block creator, reply with true block creator username
         // TODO: if X blocks are created, send a message to the list of conns saying so, so that they can shift block creator & empty list
         // TODO: in case blocks are not able to be sent to a particular member after 3 tries, pop them from the list of connections
         // TODO: if list of connections are empty and some of the X blocks are still left, it means that you are offline, so handle accordingly
-        // TODO: if no msgs, send message saying no msg so that connection is still established
 
         const group = JSON.parse(message.payload).group;
         const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === group.name && x.group.createdAt === group.createdAt);

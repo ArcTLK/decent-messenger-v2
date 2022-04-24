@@ -7,6 +7,7 @@ import MessageType from "../enums/MessageType";
 import Block, { BlockMessageItem } from "../models/Block";
 import Contact from "../models/Contact";
 import Group from "../models/Group";
+import Blockchain from "./Blockchain";
 import Database from "./Database";
 import { askForBlockCreator, connectToBlockCreator } from "./Election";
 import { encryptPayload, generateSignatureWithoutCleaning, isPeerOnline, sendMessage } from "./Peer";
@@ -173,7 +174,7 @@ export class GroupManager {
                 const signedPayload = {
                     ...payload,
                     digitalSignature: signature,
-                    previousHash: this.group.blockchain ? this.group.blockchain.blocks[this.group.blockchain.blocks.length - 1].hash : ''
+                    previousHash: this.group.blockchain && this.group.blockchain.blocks.length > 0 ? this.group.blockchain.blocks[this.group.blockchain.blocks.length - 1].hash : ''
                 }
 
                 const hash = SHA256(JSON.stringify(signedPayload)).toString(enc.Base64);
@@ -185,7 +186,23 @@ export class GroupManager {
 
                 this.messages = [];
 
-                // TODO: update db
+                // update db
+                if (!this.group.blockchain) {
+                    this.group.blockchain = new Blockchain();
+                }
+
+                if (!this.group.blockchain.blocks.find(x => x && x.hash === block.hash)) {
+                    this.group.blockchain.blocks.push(block);
+                }
+
+                // check block for unsent messages and delete them from the db
+                const hashes = new Set(block.messages.filter(x => x.senderUsername === SimpleObjectStore.user?.username).map(x => x.digitalSignature));
+                this.group.unsentMessages = this.group.unsentMessages ? this.group.unsentMessages.filter(x => !hashes.has(x.digitalSignature)) : [];
+
+                Database.groups.update(this.group, {
+                    blockchain: this.group.blockchain,
+                    unsentMessages: this.group.unsentMessages
+                });
 
                 // send block to connections
                 this.connections.forEach(async connection => {                        
