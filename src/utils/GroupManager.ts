@@ -1,3 +1,5 @@
+import { Buffer } from "buffer";
+import { SHA256, enc } from "crypto-js";
 import { DataConnection } from "peerjs";
 import { Globals } from "../Constants";
 import ErrorType from "../enums/ErrorType";
@@ -7,7 +9,7 @@ import Contact from "../models/Contact";
 import Group from "../models/Group";
 import Database from "./Database";
 import { askForBlockCreator, connectToBlockCreator } from "./Election";
-import { encryptPayload, isPeerOnline, sendMessage } from "./Peer";
+import { encryptPayload, generateSignatureWithoutCleaning, isPeerOnline, sendMessage } from "./Peer";
 import { SimpleObjectStore } from "./Store";
 
 export class GroupManager {
@@ -140,10 +142,10 @@ export class GroupManager {
     async becomeBlockCreator() {
         // start listening for messages and creating blocks
         let blocksCreated = 0;
-        var interval = setInterval(() => {
+        var interval = setInterval(async () => {
             // create block and send them to active connections
-            if (this.messages.length === 0 || true) { // TODO: remove or true later
-                // reply saying no messages to connections
+            if (this.messages.length === 0) {
+                // send null block to connections
                 this.connections.forEach(async connection => {                        
                     const contact = await Database.contacts.get({
                         username: connection.metadata.username
@@ -161,7 +163,46 @@ export class GroupManager {
                 });
             }
             else {
+                // create block to add in blockchain
+                const payload = {
+                    serial: this.group.blockchain ? this.group.blockchain.blocks.length : 0,
+                    timestamp: new Date().getTime(),
+                    messages: this.messages                    
+                }
+                const signature = Buffer.from(await generateSignatureWithoutCleaning(payload)).toString('base64');
+                const signedPayload = {
+                    ...payload,
+                    digitalSignature: signature,
+                    previousHash: this.group.blockchain ? this.group.blockchain.blocks[this.group.blockchain.blocks.length - 1].hash : ''
+                }
 
+                const hash = SHA256(JSON.stringify(signedPayload)).toString(enc.Base64);
+
+                let block: Block = {
+                    ...signedPayload,
+                    hash
+                }
+
+                this.messages = [];
+
+                // TODO: update db
+
+                // send block to connections
+                this.connections.forEach(async connection => {                        
+                    const contact = await Database.contacts.get({
+                        username: connection.metadata.username
+                    });
+                    
+                    if (contact) {
+                        connection.send({
+                            type: MessageType.AddBlock,
+                            payload: await encryptPayload(JSON.stringify({ block }), contact.publicKey)
+                        });
+                    }      
+                    else {
+                        console.error(ErrorType.ContactNotFound);
+                    }              
+                });
             }
 
             blocksCreated += 1;

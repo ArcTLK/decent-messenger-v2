@@ -1,7 +1,7 @@
 import Block from "../models/Block";
 
 class Blockchain {
-    blocks: Block[];
+    blocks: Block[] = [];
 
     addBlock(block: Block) {
         this.blocks.push(block);

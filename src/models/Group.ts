@@ -9,6 +9,6 @@ export default interface Group {
     admins: Contact[];
     encryptionKey: string;
     createdAt: number;
-    blockchain?: Blockchain[];
+    blockchain?: Blockchain;
     unsentMessages?: BlockMessageItem[];
 }
