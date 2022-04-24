@@ -18,6 +18,8 @@ import { addLog } from './models/Log';
 import { IndexableType, liveQuery } from 'dexie';
 import { GroupManager } from './utils/GroupManager';
 import User from './models/User';
+import ChatType from './enums/ChatType';
+import BlockChainDebug from './components/BlockChainDebug';
 
 const themeLight = createTheme({
 	palette: {
@@ -144,6 +146,14 @@ function App() {
 							<SideBar />
 							<Divider orientation="vertical" />
 							<ChatPanel />
+							{state.currentOpenedChat.type === ChatType.Group && 
+								(
+									<>
+										<Divider orientation="vertical" />
+										<BlockChainDebug />
+									</>
+								)
+							}							
 						</Box>
 					</Box>
 				</ThemeProvider>

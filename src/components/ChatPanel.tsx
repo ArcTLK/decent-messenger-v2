@@ -7,7 +7,7 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MessageStatus from '../enums/MessageStatus';
-import { Context } from '../utils/Store';
+import { Context, SimpleObjectStore } from '../utils/Store';
 import { messageQueue } from '../utils/MessageQueue';
 import Database from '../utils/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -16,8 +16,11 @@ import StoredMessage from '../models/message/StoredMessage';
 import PayloadMessage from '../models/message/PayloadMessage';
 import MessageType from '../enums/MessageType';
 import ChatType from '../enums/ChatType';
-import { secureMessage, cleanMessage, createPayloadMessage, generateSignature } from '../utils/Peer';
+import { createPayloadMessage, generateSignatureWithoutCleaning, sendMessage, secureMessage, cleanMessage, generateSignature } from '../utils/Peer';
 import Contact from '../models/Contact';
+import { BlockMessageItem } from '../models/Block';
+import Group from '../models/Group';
+import { Buffer } from 'buffer';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -33,6 +36,31 @@ const ChatPanel = () => {
     const [messageInfoContent, setMessageInfoContent] = useState({} as StoredMessage);
 
     const namesFromUsernames: { [id: string] : string} = {};
+
+    // show group messages 
+    const group = useLiveQuery(async () => {
+        if (state.currentOpenedChat.type === ChatType.Group) {
+            return await Database
+                .groups
+                .where({
+                    name: (state.currentOpenedChat.data as Group).name,
+                    createdAt: (state.currentOpenedChat.data as Group).createdAt
+                }).first();
+        }
+        else {
+            return null;
+        }
+    }, [state.currentOpenedChat]);
+
+    let groupMessages: BlockMessageItem[] = [];
+    if (group && group.blockchain) {
+        // gather all messages
+        group.blockchain.blocks.forEach(block => {
+            groupMessages.push(...block.messages);
+        });
+        
+        groupMessages.sort((a, b) => a.createdAt - b.createdAt);
+    }
 
     const messages = useLiveQuery(async () => {
         if (state.currentOpenedChat.type === ChatType.Private) {
@@ -64,17 +92,7 @@ const ChatPanel = () => {
 
             return msgs;
         }
-        else {
-            // TODO: show group messages
-
-            // // going through group messages and mapping names from usernames
-            // for(const msg of msgs) {
-            //     if(!(msg.senderUsername === state.user.username || msg.senderUsername in namesFromUsernames)) {
-            //         const contact = await Database.contacts.where('username').equals(msg.senderUsername).first();
-            //         namesFromUsernames[msg.senderUsername] = (contact as Contact).name;
-            //     }
-            // }
-
+        else {                       
             return [];
         }        
     }, [state.currentOpenedChat]);
@@ -84,7 +102,7 @@ const ChatPanel = () => {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
 
-    }, [state.currentOpenedChat, messages]);
+    }, [state.currentOpenedChat, messages, group]);
 
     const onSendMessageButtonClick = async () => {
         if(typedMessage === '') {
@@ -107,7 +125,64 @@ const ChatPanel = () => {
             messageQueue.addMessage(message);
         }
         else {
-            // TODO: send group message
+            // send group message
+            const unsignedBlockItem = {
+                senderUsername: SimpleObjectStore.user!.username,
+                createdAt: new Date().getTime(),
+                message: typedMessage
+            };
+            const signature = await generateSignatureWithoutCleaning(unsignedBlockItem);
+
+            const payload: BlockMessageItem = {
+                ...unsignedBlockItem,
+                digitalSignature: Buffer.from(signature).toString('base64')
+            };
+            
+            const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === state.currentOpenedChat.data.name && x.group.createdAt === (state.currentOpenedChat.data as Group).createdAt);
+
+            if (groupManager) {
+                if (groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username) {
+                    // you are the block creator, so simply add the message to the block
+                    groupManager.messages.push(payload);
+                }
+                else {
+                    const tellBlockCreatorToAddMessage = async () => {
+                        const connection = groupManager.blockCreatorConnection!;
+                        const message = await createPayloadMessage(JSON.stringify({
+                            ...payload,
+                            group: {
+                                name: groupManager.group.name,
+                                createdAt: groupManager.group.createdAt
+                            }
+                        }), MessageType.GroupMessage, groupManager.roundRobinList[groupManager.roundRobinIndex].username);
+
+                        sendMessage(message, uuidv4(), connection);
+                    }
+                    
+                    // get block creator connection and use that to send the msg
+                    if (groupManager.blockCreatorConnection === null) {
+                        console.error('Not connected to block creator, reconnecting!');
+                        groupManager.reconnect().then(() => {
+                            tellBlockCreatorToAddMessage();
+                        });
+                    }
+                    else {
+                        tellBlockCreatorToAddMessage();
+                    }
+                }
+
+                // save message in database
+                if (groupManager.group.unsentMessages) {
+                    groupManager.group.unsentMessages.push(payload);
+                }
+                else {
+                    groupManager.group.unsentMessages = [payload];
+                }
+
+                Database.groups.update(groupManager.group, {
+                    unsentMessages: groupManager.group.unsentMessages
+                });
+            }
         }        
 
         setTypedMessage('');
@@ -116,6 +191,46 @@ const ChatPanel = () => {
     const retrySendingMessage = (message: StoredMessage) => {
         messageQueue.retryMessage(message);
     };
+
+    const retrySendingGroupMessage = (message: BlockMessageItem) => {
+        // retry
+        const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === state.currentOpenedChat.data.name && x.group.createdAt === (state.currentOpenedChat.data as Group).createdAt);
+
+        if (groupManager) {
+            if (groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username) {
+                // you are the block creator, so simply add the message to the block
+                // check if message exists already
+                if (!groupManager.messages.find(x => x.digitalSignature === message.digitalSignature)) {
+                    groupManager.messages.push(message);
+                }                
+            }
+            else {
+                const tellBlockCreatorToAddMessage = async () => {
+                    const connection = groupManager.blockCreatorConnection!;
+                    const msg = await createPayloadMessage(JSON.stringify({
+                        ...message,
+                        group: {
+                            name: groupManager.group.name,
+                            createdAt: groupManager.group.createdAt
+                        }
+                    }), MessageType.GroupMessage, groupManager.roundRobinList[groupManager.roundRobinIndex].username);
+
+                    sendMessage(msg, uuidv4(), connection);
+                }
+                
+                // get block creator connection and use that to send the msg
+                if (groupManager.blockCreatorConnection === null) {
+                    console.error('Not connected to block creator, reconnecting!');
+                    groupManager.reconnect().then(() => {
+                        tellBlockCreatorToAddMessage();
+                    });
+                }
+                else {
+                    tellBlockCreatorToAddMessage();
+                }
+            }
+        }
+    }
 
     const showMessageInfo = (message: StoredMessage) => {
         // handle message info here
@@ -190,6 +305,63 @@ const ChatPanel = () => {
     
                 {/* ChatPanel Messages */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexGrow: 1, overflow: 'auto', p: 2 }}>
+                {group && groupMessages.map((message: BlockMessageItem, index) => (
+                        <Box key={index} alignSelf={(message.senderUsername===state.user.username) ? 'flex-end' : 'flex-start'} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, my: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center'}}>
+                                <Box order={(message.senderUsername===state.user.username)? 2 : 1} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 1.5, borderRadius: 2 }} bgcolor={message.senderUsername===state.user.username? 'primary.main' : 'secondary.light'} >
+                                    {state.currentOpenedChat.type == ChatType.Group && <Box sx={{ display: 'flex', alignItems: 'center'}}>
+                                        {/* Fetch name of user via username below */}
+                                        {/* <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'} sx={{ fontSize: 12 }}>{ namesFromUsernames[message.senderUsername] }</Box> */}
+                                        <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'} sx={{ fontSize: 12 }}>{ message.senderUsername }</Box>
+                                    </Box>}
+
+                                    <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.message}</Box>
+                                </Box>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center', gap: 0.5 }}>
+                                <Box color='text.secondary' sx={{ display: 'flex', alignItems: 'center', fontSize: 12 }}>
+                                    {new Date(message.createdAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </Box>
+
+                                {message.senderUsername===state.user.username && <Box color='text.secondary' sx={{ display: 'flex', alignItems: 'center' }}>
+                                    <DoneIcon sx={{ fontSize: 16 }}/>
+                                </Box>}
+                            </Box>
+                        </Box>
+                    ))}
+
+                    {group && group.unsentMessages && group.unsentMessages.map((message: BlockMessageItem, index) => (
+                        <Box key={index} alignSelf={(message.senderUsername===state.user.username) ? 'flex-end' : 'flex-start'} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, my: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center'}}>
+                                <Box order={(message.senderUsername===state.user.username)? 2 : 1} sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxWidth: 360, py: 1, px: 1.5, borderRadius: 2 }} bgcolor={message.senderUsername===state.user.username? 'primary.main' : 'secondary.light'} >
+                                    {state.currentOpenedChat.type == ChatType.Group && <Box sx={{ display: 'flex', alignItems: 'center'}}>
+                                        {/* Fetch name of user via username below */}
+                                        {/* <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'} sx={{ fontSize: 12 }}>{ namesFromUsernames[message.senderUsername] }</Box> */}
+                                        <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'} sx={{ fontSize: 12 }}>{ message.senderUsername }</Box>
+                                    </Box>}
+
+                                    <Box color={message.senderUsername===state.user.username? 'white' : 'text.primary'}>{message.message}</Box>
+                                </Box>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center', gap: 0.5 }}>
+                                <Box color='text.secondary' sx={{ display: 'flex', alignItems: 'center', fontSize: 12 }}>
+                                    {new Date(message.createdAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </Box>
+
+                                {message.senderUsername===state.user.username && <Box color='text.secondary' sx={{ display: 'flex', alignItems: 'center' }}>
+                                {
+                                    <>
+                                        <AccessTimeIcon sx={{ fontSize: 16 }}/>
+                                        <Button size='small' variant="text" onClick={() => retrySendingGroupMessage(message)}>Retry</Button>
+                                    </>
+                                }
+                                </Box>}
+                            </Box>
+                        </Box>
+                    ))}
+
                     {messages && messages.map((message, index) => (
                         <Box key={index} alignSelf={(message.senderUsername===state.user.username)? 'flex-end' : 'flex-start'} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, my: 1 }}>
                             <Box sx={{ display: 'flex', justifyContent: message.senderUsername===state.user.username? 'end' : 'start', alignItems: 'center'}}>

@@ -9,7 +9,9 @@ enum MessageType {
     ConnectToBlockCreator = 'Connect to block creator',
     AskForBlockCreator = 'Ask for block creator',
     Answer = 'Answer',
-    Heartbeat = 'Heartbeat'
+    Heartbeat = 'Heartbeat',
+    GroupMessage = 'Group Message',
+    IAmNotBlockCreator = 'I am not block creator'
 }
 
 

@@ -2,14 +2,17 @@ import { DataConnection } from "peerjs";
 import { v4 } from "uuid";
 import { Globals } from "../Constants";
 import MessageType from "../enums/MessageType";
+import { BlockMessageItem } from "../models/Block";
 import Contact from "../models/Contact";
 import Group from "../models/Group";
 import { addLog } from "../models/Log";
+import Blockchain from "./Blockchain";
+import Database from "./Database";
 import { GroupManager } from "./GroupManager";
-import { createPayloadMessage, sendMessage } from "./Peer";
+import { createPayloadMessage, decryptPayload, sendMessage } from "./Peer";
 import { SimpleObjectStore } from "./Store";
 
-export async function connectToBlockCreator(groupManager: GroupManager, username: string): Promise<DataConnection> {
+export async function connectToBlockCreator(groupManager: GroupManager, username: string): Promise<DataConnection | null> {
     const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(username);
     const logId = v4();
     
@@ -24,7 +27,8 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
 
     function cleanVariables() {
         clearInterval(interval);
-        groupManager.shiftBlockCreator();
+        // groupManager.shiftBlockCreator();
+        groupManager.reconnect();
         SimpleObjectStore.peerBank.removePeer(username);
     }
 
@@ -36,26 +40,46 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
     }), MessageType.ConnectToBlockCreator, username);
 
     try {
-        const result = await sendMessage(message, logId, connection);
-
-        console.log(result);
-        
+        const result = await sendMessage(message, logId, connection);        
         
         if (result.blockCreator === null) {
-            // TODO: hes not block creator and doesnt know who is, trigger the ask process
-
+            // hes not block creator and doesnt know who is, trigger the ask process
+            return null;
         }
         else if (result.blockCreator !== groupManager.roundRobinIndex) {
-            // TODO: someone else is block creator, connect to them instead
+            // someone else is block creator, connect to them instead
+            return await connectToBlockCreator(groupManager, groupManager.roundRobinList[result.blockCreator].username);
         }
         else {
             // they are the block creator
-            connection.on('data', data => {
+            connection.on('data', async data => {
                 // receive block data
-                // TODO: call handleReceivedMessage
+                if (data.type === MessageType.AddBlock) {
+                    data.payload = JSON.parse(await decryptPayload(data.payload)); 
+                }
+
+                if (data.payload.block) {
+                    // received a block save it in db
+                    if (!groupManager.group.blockchain) {
+                        groupManager.group.blockchain = new Blockchain();
+                    }
+
+                    if (!groupManager.group.blockchain.blocks.find(x => x && x.hash === data.payload.block.hash)) {
+                        groupManager.group.blockchain.blocks.push(data.payload.block);
+                    } 
+
+                    // check block for unsent messages and delete them from the db
+                    const hashes = new Set(data.payload.block.messages.filter((x: BlockMessageItem) => x.senderUsername === SimpleObjectStore.user?.username).map((x: BlockMessageItem) => x.digitalSignature));
+                    groupManager.group.unsentMessages = groupManager.group.unsentMessages ? groupManager.group.unsentMessages.filter(x => !hashes.has(x.digitalSignature)) : [];
+
+                    Database.groups.update(groupManager.group, {
+                        blockchain: groupManager.group.blockchain,
+                        unsentMessages: groupManager.group.unsentMessages
+                    });
+                }
+
                 // TODO: if you had sent a message, check if your message is in this block or next 2 subsequent blocks, if not check block creator
                 // if they are the same creator still, show an alert saying that your message was maliciously deleted by them
-                console.log(data);
                 timer = new Date().getTime();
             });
         }
@@ -63,6 +87,7 @@ export async function connectToBlockCreator(groupManager: GroupManager, username
     catch (e) {
         // TODO: handle connection error case
         console.error(e);
+        return null;
     }    
 
     connection.on('error', error => {

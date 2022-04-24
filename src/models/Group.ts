@@ -1,4 +1,6 @@
+import { IndexableType } from "dexie";
 import Blockchain from "../utils/Blockchain";
+import { BlockMessageItem } from "./Block";
 import Contact from "./Contact";
 
 export default interface Group {
@@ -7,5 +9,6 @@ export default interface Group {
     admins: Contact[];
     encryptionKey: string;
     createdAt: number;
-    blockchain?: Blockchain[];
+    blockchain?: Blockchain;
+    unsentMessages?: BlockMessageItem[];
 }

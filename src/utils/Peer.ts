@@ -49,17 +49,21 @@ export function cleanMessage(message: StoredMessage | SecurePayloadMessage | Pay
     };
 }
 
-export async function generateSignature(message: SecurePayloadMessage) {
-    // create digital signature
+export async function generateSignatureWithoutCleaning(payload: any) {
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
-        const cleanedMessage = cleanMessage(message);
-
-        return await rsa.sign(new TextEncoder().encode(JSON.stringify(cleanedMessage)), JSON.parse(keys.payload).privateKey, 'SHA-256');
+        return await rsa.sign(new TextEncoder().encode(JSON.stringify(payload)), JSON.parse(keys.payload).privateKey, 'SHA-256');
     }
     else {
         throw new Error(ErrorType.RSAKeyStoreNotFound);
     }
+}
+
+export async function generateSignature(message: SecurePayloadMessage) {
+    // create digital signature
+    const cleanedMessage = cleanMessage(message);
+
+    return await generateSignatureWithoutCleaning(cleanedMessage);
 }
 
 export async function secureMessage(message: PayloadMessage): Promise<SecurePayloadMessage> {
@@ -96,7 +100,7 @@ export async function encryptPayload(payload: string, key: JsonWebKey): Promise<
     };
 }
 
-async function decryptPayload(data: { ciphertext: string, key: ArrayBuffer }): Promise<string> {
+export async function decryptPayload(data: { ciphertext: string, key: ArrayBuffer }): Promise<string> {
     const keys = await Database.app.get('rsa-keystore');
     if (keys) {
         // decrypt AES key
@@ -274,12 +278,9 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         await Database.groups.add(JSON.parse(message.payload));
     }
     else if (message.type === MessageType.ConnectToBlockCreator) {
-        // TODO: add to list of connections to forward the created blocks to
-        // TODO: if currently not block creator, reply with true block creator username
         // TODO: if X blocks are created, send a message to the list of conns saying so, so that they can shift block creator & empty list
         // TODO: in case blocks are not able to be sent to a particular member after 3 tries, pop them from the list of connections
         // TODO: if list of connections are empty and some of the X blocks are still left, it means that you are offline, so handle accordingly
-        // TODO: if no msgs, send message saying no msg so that connection is still established
 
         const group = JSON.parse(message.payload).group;
         const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === group.name && x.group.createdAt === group.createdAt);
@@ -317,6 +318,29 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
             type: MessageType.Acknowledgment,
             payload: 'Hello!'
         });
+    }
+    else if (message.type === MessageType.GroupMessage) {
+        const payload = JSON.parse(message.payload);
+        const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === payload.group.name && x.group.createdAt === payload.group.createdAt);
+        delete payload.group;
+        
+        if (groupManager) {
+            // check if you are the block creator
+            if (groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username) {
+                // check if message is already in queue
+                if (!groupManager.messages.find(x => x.digitalSignature === payload.digitalSignature)) {
+                    groupManager.messages.push(payload);
+                }
+            }
+            else {
+                // reject
+                responseType = MessageType.IAmNotBlockCreator;
+            }
+        }
+        else {
+            // not my group, reject
+            responseType = MessageType.IAmNotBlockCreator;
+        }
     }
 
     if (message.secure) {

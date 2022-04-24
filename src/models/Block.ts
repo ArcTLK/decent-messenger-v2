@@ -9,7 +9,7 @@ interface Block {
     serial: number;
     timestamp: number;
     digitalSignature: string;
-    encryptionKeyHash: string;
+    //encryptionKeyHash: string;
     hash: string;
     previousHash: string;
     messages: BlockMessageItem[];   

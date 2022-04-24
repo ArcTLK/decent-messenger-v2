@@ -18,12 +18,12 @@ class Database extends Dexie {
 
     constructor() {
         super('decent-db');
-        this.version(13).stores({
+        this.version(14).stores({
             messages: '++id, [nonce+senderUsername+createdAt], receiverUsername, status, senderUsername',
             contacts: '++id, username',
             app: 'type',
             logs: '++id, done, groupId, timestamp',
-            groups: '++id'
+            groups: '++id, [name+createdAt]'
         });
 
         this.on('ready', () => {
