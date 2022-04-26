@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "/decent-messenger-v2/static/css/main.3ce23c5e.css",
-    "main.js": "/decent-messenger-v2/static/js/main.5069df66.js",
+    "main.js": "/decent-messenger-v2/static/js/main.085c71e2.js",
     "static/js/787.bc6cfed6.chunk.js": "/decent-messenger-v2/static/js/787.bc6cfed6.chunk.js",
     "index.html": "/decent-messenger-v2/index.html",
     "static/media/logo.svg": "/decent-messenger-v2/static/media/logo.3a03708e42481565259f85329d20b695.svg",
     "main.3ce23c5e.css.map": "/decent-messenger-v2/static/css/main.3ce23c5e.css.map",
-    "main.5069df66.js.map": "/decent-messenger-v2/static/js/main.5069df66.js.map",
+    "main.085c71e2.js.map": "/decent-messenger-v2/static/js/main.085c71e2.js.map",
     "787.bc6cfed6.chunk.js.map": "/decent-messenger-v2/static/js/787.bc6cfed6.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.3ce23c5e.css",
-    "static/js/main.5069df66.js"
+    "static/js/main.085c71e2.js"
   ]
 }
