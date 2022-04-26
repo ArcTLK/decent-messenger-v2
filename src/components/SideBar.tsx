@@ -56,27 +56,40 @@ const SideBar = () => {
         }
 
         // Handle Add Contact Here
+        const targetName = searchUser;
         const uuid = v4();
-        addLog('Fetching Peer Data for ' + searchUser, uuid, 'Adding Contact (Sender)');
-        getPeerDataFromUsername(searchUser).then(peerData => {
-            addLog('Executing RSA public key exchange for user ' + searchUser, uuid, 'Adding Contact (Sender)');
-            doRsaPublicKeyExchange(state.user.username, searchUser, uuid).then(key => {
+        addLog('Fetching Peer Data for ' + targetName, uuid, 'Adding Contact (Sender)');
+        getPeerDataFromUsername(targetName).then(peerData => {
+            addLog('Executing RSA public key exchange for user ' + targetName, uuid, 'Adding Contact (Sender)');
+            doRsaPublicKeyExchange(state.user.username, targetName, uuid).then(key => {
                 // create contact object
                 const contact: Contact = {
                     name: peerData.name,
-                    username: searchUser,
+                    username: targetName,
                     publicKey: key
                 };
 
-                Database.contacts.add(contact);              
+                // check if contact exists before adding
+                Database.contacts.where({ username: targetName }).first().then(x => {
+                    if (!x) {
+                        // does not exist
+                        Database.contacts.add(contact).then(() => {
+                            addLog('Created and saved contact for ' + targetName, uuid, 'Adding Contact (Sender)', LogType.Info, 1);
+                        });
+                    }
+                });
 
-                addLog('Created and saved contact for ' + searchUser, uuid, 'Adding Contact (Sender)', LogType.Info, 1);
                 setSearchUser('');
             }).catch(error => {
-                if (error === ErrorType.KeyExchangeTimeout) {
-                    alert('User is currently offline, so cannot perform RSA Key exchange!');
-                }
-                else throw new Error(error);
+                console.error(error);
+                dispatch({
+                    type: 'UpdateSnackbar',
+                    payload: {
+                        isOpen: true,
+                        type: 'error',
+                        message: 'User is currently offline, so cannot perform RSA Key exchange!'
+                    }
+                });
             });
         }).catch(error => {
             alert(error);
@@ -108,6 +121,28 @@ const SideBar = () => {
 
     const onConfirmCreateGroup = () => {
         // Handle when user clicks on create button in create group dialog
+        if (newGroupName == '') {
+            return dispatch({
+                type: 'UpdateSnackbar',
+                payload: {
+                    isOpen: true,
+                    type: 'error',
+                    message: 'Please enter a group name!'
+                }
+            });
+        }
+
+        if (contactsInNewGroup.length === 0) {
+            return dispatch({
+                type: 'UpdateSnackbar',
+                payload: {
+                    isOpen: true,
+                    type: 'error',
+                    message: 'Please select at least one group participant!'
+                }
+            });
+        }
+
         console.log('Creating new group:', newGroupName);
         console.log('Participants:', contactsInNewGroup);
 
@@ -187,7 +222,7 @@ const SideBar = () => {
                     </IconButton>
 
                     {/* For Debugging */}
-                    <IconButton onClick={() => {
+                    <IconButton onDoubleClick={() => {
                         console.log('Database erased');
                         Database.erase();
                         dispatch({
@@ -207,7 +242,7 @@ const SideBar = () => {
 
             {/* SearchBar */}
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', p: 2 }}>
-                <TextField fullWidth onChange={e => setSearchUser(e.target.value)} size='small' label="Search User" type="search" />
+                <TextField fullWidth onChange={e => setSearchUser(e.target.value)} value={searchUser} size='small' label="Search User" type="search" />
                 <IconButton onClick={onAddContactButtonClick}>
                     <AddIcon />
                 </IconButton>

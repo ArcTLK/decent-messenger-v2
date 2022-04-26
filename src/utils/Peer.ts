@@ -248,29 +248,36 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
     if (message.type === MessageType.KeyExchange) {
         // create a contact
         addLog(`Received someone's RSA public key, finding out who (asking Web Server).`, uuid, 'Adding Contact (Receiver)');
-        getPeerDataFromUsername(message.senderUsername).then(peerData => {             
+        getPeerDataFromUsername(message.senderUsername).then(async peerData => {             
             addLog(`Their name was ${peerData.name}.`, uuid, 'Adding Contact (Receiver)');
-            Database.contacts.add({
-                name: peerData.name,
-                username: message.senderUsername,
-                publicKey: message.payload
-            }).then(() => {
+            // check if does not exist
+            const x = await Database.contacts.where({ username: message.senderUsername }).first();
+
+            if (!x) {
+                await Database.contacts.add({
+                    name: peerData.name,
+                    username: message.senderUsername,
+                    publicKey: message.payload
+                });
+
                 addLog(`Created and saved their contact.`, uuid, 'Adding Contact (Receiver)');
-                Database.app.get('rsa-keystore').then(keys => {
-                    if (keys) {
-                        const key = JSON.parse(keys.payload).publicKey;
-                        addLog(`Sending them our RSA public key.`, uuid, 'Adding Contact (Receiver)', LogType.Info, 1);
-                        // reply with our public key
-                        dataConnection.send({
-                            type: MessageType.KeyExchangeReply,
-                            publicKey: key
-                        });
-                    }
-                    else {
-                        console.error(ErrorType.RSAKeyStoreNotFound);
-                    }
-                });                        
-            });
+                
+            }
+            
+            Database.app.get('rsa-keystore').then(keys => {
+                if (keys) {
+                    const key = JSON.parse(keys.payload).publicKey;
+                    addLog(`Sending them our RSA public key.`, uuid, 'Adding Contact (Receiver)', LogType.Info, 1);
+                    // reply with our public key
+                    dataConnection.send({
+                        type: MessageType.KeyExchangeReply,
+                        publicKey: key
+                    });
+                }
+                else {
+                    console.error(ErrorType.RSAKeyStoreNotFound);
+                }
+            });   
         });
     }
     else if (message.type === MessageType.CreateGroup) {
@@ -368,19 +375,26 @@ export function doRsaPublicKeyExchange(ourUsername: string, theirUsername: strin
             Database.app.get('rsa-keystore').then(async data => {
                 if (data) {
                     const keys = JSON.parse(data.payload);
-                    const connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(theirUsername);
+                    let connection: DataConnection;
+
+                    try {
+                        connection = await SimpleObjectStore.peerBank.getDataConnectionForUsername(theirUsername);
+                    }
+                    catch (e) {
+                        reject(e);
+                    }                    
 
                     if (logId) {
                         addLog('Sending my RSA public key to ' + theirUsername, logId, 'Adding Contact (Sender)');
                     }
                     
-                    connection.send({
+                    connection!.send({
                         payload: keys.publicKey,
                         senderUsername: ourUsername,
                         type: MessageType.KeyExchange
                     });
 
-                    connection.on('data', data => {
+                    connection!.on('data', (data: any) => {
                         // listen for public key of other party
                         if (data.type === MessageType.KeyExchangeReply) {
                             if (logId) {
