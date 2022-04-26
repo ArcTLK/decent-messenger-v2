@@ -20,6 +20,7 @@ import { messageQueue } from './MessageQueue';
 import Contact from '../models/Contact';
 import Group from '../models/Group';
 import { SimpleObjectStore } from './Store';
+import { GroupManager } from './GroupManager';
 
 // helper functions
 export async function createPayloadMessage(payload: string, type: MessageType, receiverUsername: string): Promise<PayloadMessage> {
@@ -282,7 +283,11 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
     }
     else if (message.type === MessageType.CreateGroup) {
         // store group details in database
-        await Database.groups.add(JSON.parse(message.payload));
+        const group = JSON.parse(message.payload);
+        await Database.groups.add(group);
+        const groupManager = new GroupManager(group);
+        SimpleObjectStore.groupManagers.push(groupManager);
+        groupManager.connect();
     }
     else if (message.type === MessageType.ConnectToBlockCreator) {
         // TODO: if X blocks are created, send a message to the list of conns saying so, so that they can shift block creator & empty list
@@ -499,6 +504,9 @@ export async function createGroup(user: User, name: string, members: Contact[]) 
         createdAt: new Date().getTime()
     }
     await Database.groups.add(group);
+    const groupManager = new GroupManager(group);
+    SimpleObjectStore.groupManagers.push(groupManager);
+    groupManager.connect();
     
     // construct payload
     const payload = JSON.stringify(group);
