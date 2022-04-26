@@ -89,7 +89,9 @@ export default class PeerBank {
                 // create a data connection
                 this.createDataConnection(peerData.myPeer, username).then(connection => {
                     resolve(connection);
-                });
+                }).catch(e => reject(e));
+            }).catch(e => {
+                reject(e);
             });
         });
     }
@@ -105,11 +107,11 @@ export default class PeerBank {
                     // create a data connection
                     this.createDataConnection(this.peers[username].myPeer, username).then(connection => {
                         resolve(connection);
-                    });
+                    }).catch(e => reject(e));
                 }
             }
             else {
-                resolve(await this.getFreshDataConnectionFromUsername(username))
+                this.getFreshDataConnectionFromUsername(username).then(connection => resolve(connection)).catch(e => reject(e));
             }
         });        
     }
@@ -125,6 +127,10 @@ export default class PeerBank {
                 this.peers[username].lastUsed = new Date();
                 resolve(dataConnection);
             });
+
+            setTimeout(() => {
+                reject('Connection timeout');
+            }, Globals.messageTimeoutDuration);
         });
     }
     

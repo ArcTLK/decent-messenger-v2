@@ -451,6 +451,7 @@ export function sendMessage(message: StoredMessage | PayloadMessage, logId?: str
 
                 SimpleObjectStore.peerBank.reportError(message.receiverUsername);
                 console.error(e);
+                reject(e);
             }
 
             connection.on('data', replyHandler);             

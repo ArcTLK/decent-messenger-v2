@@ -81,7 +81,7 @@ const BlockChainDebug = () => {
                             <Typography variant="h6" component="div">Status</Typography>
                             <Typography variant="body1" component="div">
                                 {
-                                    groupManager.connecting ? 'Connecting' :
+                                    groupManager.connecting || groupManager.roundRobinIndex === -1 ? 'Connecting' :
                                     groupManager.connected ? 
                                     groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user!.username ? 'Block Creator' : 'Connected' :
                                     'Loading'
@@ -109,9 +109,8 @@ const BlockChainDebug = () => {
                                 Time elapsed: {timer} seconds
                             </Typography>
                         </Box>                        
-                        
                         {
-                            groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username && (
+                            groupManager.roundRobinIndex >= 0 && groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username && (
                                 <Box sx={{ my: 2, pb: 1, boxShadow: 3 }}>
                                     <Box sx={{ p: 2, bgcolor: 'primary.main' }}>
                                         <Typography variant="h6" component="div" sx={{ color: 'white' }}>Creating Block #{groupManager.group.blockchain ? groupManager.group.blockchain.blocks.length : 0 }</Typography>
