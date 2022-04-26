@@ -64,6 +64,7 @@ export default class MessageQueue {
                         // update db and remove from queue
                         Database.messages.update(item.id!, {
                             status: MessageStatus.Sent,
+                            sentAt: new Date().getTime()
                         });
                         this.messages.splice(this.messages.findIndex(x => x.id === item.id), 1);
                         

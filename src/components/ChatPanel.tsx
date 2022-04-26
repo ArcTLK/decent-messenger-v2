@@ -74,19 +74,24 @@ const ChatPanel = () => {
                 .sortBy('createdAt');
             
             let totalRetries = 0;
-            let avgTimeTakenToSendMessage = 2.5;
+            let avgTimeTakenToSendMessage = 0;
             let count = 0;
+            let sentAtCount = 0;
 
             for(const msg of msgs) {
                 // calculate avg. time taken to send a message and avg no. of retries
                 if(msg.senderUsername === state.user.username) {
                     totalRetries += msg.retries.length;
+                    if (msg.sentAt) {
+                        avgTimeTakenToSendMessage += msg.sentAt - msg.createdAt;
+                        sentAtCount += 1;
+                    }                    
                     count++;
                 }
             }
 
             setMetricData({
-                avgTimeTakenToSendMessage: avgTimeTakenToSendMessage,
+                avgTimeTakenToSendMessage: avgTimeTakenToSendMessage / sentAtCount,
                 avgRetries: (count==0)? 0 : totalRetries / count
             });
 
@@ -295,8 +300,8 @@ const ChatPanel = () => {
                         <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentOpenedChat.data.name}</Typography>
                     </Box>
                     {state.currentOpenedChat.type == ChatType.Private && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'end' }}>
-                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average time taken to send message: {metricData.avgTimeTakenToSendMessage}</Typography>
-                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average retries: {metricData.avgRetries}</Typography>
+                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average time taken to send message: {metricData.avgTimeTakenToSendMessage ? metricData.avgTimeTakenToSendMessage.toFixed(2) + 'ms' : 'N/A'}</Typography>
+                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average retries: {metricData.avgRetries ? metricData.avgRetries.toFixed(2) : 'N/A'}</Typography>
                     </Box>}
                 </Box>
                 
