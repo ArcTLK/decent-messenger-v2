@@ -21,6 +21,8 @@ import Contact from '../models/Contact';
 import { BlockMessageItem } from '../models/Block';
 import Group from '../models/Group';
 import { Buffer } from 'buffer';
+import { MobileView } from 'react-device-detect';
+import { ArrowLeft } from '@mui/icons-material';
 
 const ChatPanel = () => {
     const {state, dispatch} = useContext(Context);
@@ -296,12 +298,24 @@ const ChatPanel = () => {
                 {/* ChatPanel Header */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, bgcolor: 'primary.main' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <MobileView>
+                            <IconButton size="small" onClick={() => {
+                                dispatch({
+                                    type: 'UpdateCurrentChat',
+                                    payload: {
+                                        type: null
+                                    }
+                                });
+                            }}>
+                                <ArrowLeft sx={{ fontSize: '2.5rem', color: 'white' }}></ArrowLeft>
+                            </IconButton>
+                        </MobileView>
                         <Avatar src={`https://avatars.dicebear.com/api/human/${(state.currentOpenedChat.type == ChatType.Private)? (state.currentOpenedChat.data as Contact).username : state.currentOpenedChat.data.name}.svg`} />
                         <Typography variant="h6" component="div" sx={{ color: 'white' }}>{state.currentOpenedChat.data.name}</Typography>
                     </Box>
                     {state.currentOpenedChat.type == ChatType.Private && <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'end' }}>
-                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average time taken to send message: {metricData.avgTimeTakenToSendMessage ? metricData.avgTimeTakenToSendMessage.toFixed(2) + 'ms' : 'N/A'}</Typography>
-                        <Typography variant="caption" sx={{ color: '#ccc' }}>Average retries: {metricData.avgRetries ? metricData.avgRetries.toFixed(2) : 'N/A'}</Typography>
+                        <Typography variant="caption" sx={{ color: '#ccc' }}>Avg. time to send: {metricData.avgTimeTakenToSendMessage ? metricData.avgTimeTakenToSendMessage.toFixed(2) + 'ms' : 'N/A'}</Typography>
+                        <Typography variant="caption" sx={{ color: '#ccc' }}>Avg. retries: {metricData.avgRetries ? metricData.avgRetries.toFixed(2) : 'N/A'}</Typography>
                     </Box>}
                 </Box>
                 

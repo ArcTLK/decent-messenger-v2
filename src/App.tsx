@@ -20,6 +20,7 @@ import { GroupManager } from './utils/GroupManager';
 import User from './models/User';
 import ChatType from './enums/ChatType';
 import BlockChainDebug from './components/BlockChainDebug';
+import { BrowserView, MobileView } from 'react-device-detect';
 
 const themeLight = createTheme({
 	palette: {
@@ -141,21 +142,29 @@ function App() {
 			<Context.Provider value={{ state, dispatch }}>
 				<SnackbarElement />
 				<ThemeProvider theme={themeLight}>
-					<Box sx={{ display: 'flex', height: '100vh', width: '100vw', p: { md: 2 } }}>
-						<Box sx={{ display: 'flex', flexGrow: 1, boxShadow: '1px 1px 10px gray' }}>
-							<SideBar />
-							<Divider orientation="vertical" />
-							<ChatPanel />
-							{state.currentOpenedChat.type === ChatType.Group && 
-								(
-									<>
-										<Divider orientation="vertical" />
-										<BlockChainDebug />
-									</>
-								)
-							}							
+					<BrowserView>
+						<Box sx={{ display: 'flex', height: '100vh', width: '100vw', p: { md: 2 } }}>
+							<Box sx={{ display: 'flex', flexGrow: 1, boxShadow: '1px 1px 10px gray' }}>
+								<SideBar />
+								<Divider orientation="vertical" />
+								<ChatPanel />
+								{state.currentOpenedChat.type === ChatType.Group && 
+									(
+										<>
+											<Divider orientation="vertical" />
+											<BlockChainDebug />
+										</>
+									)
+								}							
+							</Box>
 						</Box>
-					</Box>
+					</BrowserView>
+					<MobileView>			
+						<Box sx={{ display: 'flex', height: '100vh', width: '100vw' }}>
+							{!state.currentOpenedChat.type && <SideBar />}
+							{state.currentOpenedChat.type && <ChatPanel />}
+						</Box>									
+					</MobileView>
 				</ThemeProvider>
 			</Context.Provider>
 		);
