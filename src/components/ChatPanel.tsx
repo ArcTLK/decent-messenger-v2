@@ -13,6 +13,7 @@ import Database from '../utils/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { addLog } from '../models/Log';
 import StoredMessage from '../models/message/StoredMessage';
+import ExtraStoredMessage from '../models/message/ExtraStoredMessage';
 import PayloadMessage from '../models/message/PayloadMessage';
 import MessageType from '../enums/MessageType';
 import ChatType from '../enums/ChatType';
@@ -36,6 +37,7 @@ const ChatPanel = () => {
     const [isMessageInfoDialogOpen, setMessageInfoDialogOpen] = useState(false);
     // const [messageInfoContent, setMessageInfoContent] = useState({} as { message: StoredMessage, signature: Uint8Array});
     const [messageInfoContent, setMessageInfoContent] = useState({} as StoredMessage);
+    const [extraMessageContent, setExtraMessageContent] = useState({} as ExtraStoredMessage);
 
     const namesFromUsernames: { [id: string] : string} = {};
 
@@ -250,8 +252,17 @@ const ChatPanel = () => {
         //         console.log(messageInfoContent);
         //     });
         // });
-        setMessageInfoContent(message);
-        setMessageInfoDialogOpen(true);
+        Database.extraMessages.where({ messageId: message.id }).first().then(data => {
+            if (data) {
+                setExtraMessageContent(data);
+            }
+            else {
+                setExtraMessageContent({} as ExtraStoredMessage);
+            }
+
+            setMessageInfoContent(message);         
+            setMessageInfoDialogOpen(true);
+        });        
     }
 
     const onMessageInfoDialogClose = () => {
@@ -289,6 +300,20 @@ const ChatPanel = () => {
                             <Typography variant="caption" color='text.secondary'>Nonce</Typography>
                             <Typography variant="body1" color='text.primary'>{(messageInfoContent as StoredMessage).nonce}</Typography>
                         </Box>
+                        {
+                            extraMessageContent.messageId && (
+                                <>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                        <Typography variant="caption" color='text.secondary'>Digital Signature</Typography>
+                                        <Typography variant="body1" color='text.primary' sx={{ wordBreak: 'break-all' }}>{extraMessageContent.digitalSignature}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                        <Typography variant="caption" color='text.secondary'>Encrypted Payload</Typography>
+                                        <Typography variant="body1" color='text.primary' sx={{ wordBreak: 'break-all' }}>{extraMessageContent.encryptedPayload}</Typography>
+                                    </Box>
+                                </>
+                            )
+                        }
                     </DialogContent>
                     <DialogActions sx={{ my: 1 }}>
                         <Button variant="contained" onClick={onMessageInfoDialogClose}>Close</Button>

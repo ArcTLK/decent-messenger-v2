@@ -241,7 +241,14 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
         }
         
         addLog(`Nonce is unique.`, uuid, 'Receiving Message');
-        await Database.messages.add(cleanMessage(message) as StoredMessage);
+        const savedMessageId = await Database.messages.add(cleanMessage(message) as StoredMessage);
+
+        // save extra data
+        await Database.extraMessages.add({
+            messageId: savedMessageId,
+            encryptedPayload: message.encryptedPayload.ciphertext,
+            digitalSignature: Buffer.from(message.signature).toString('base64')
+        });
 
         responsePayload.nonce = message.nonce;
     }
@@ -354,6 +361,20 @@ async function handleReceivedMessage(message: SecurePayloadMessage, dataConnecti
             responseType = MessageType.IAmNotBlockCreator;
         }
     }
+    else if (message.type === MessageType.PullAllBlocks) {
+        const payload = JSON.parse(message.payload);
+        const groupManager = SimpleObjectStore.groupManagers.find(x => x.group.name === payload.group.name && x.group.createdAt === payload.group.createdAt);
+        delete payload.group;
+        
+        if (groupManager) {
+            // send all blocks
+            responsePayload.blockchain = groupManager.group.blockchain ?? null;
+        }
+        else {
+            // not my group, reject
+            responseType = MessageType.IAmNotBlockCreator;
+        }
+    }
 
     if (message.secure) {
         // send acknowledgement / reply
@@ -455,6 +476,16 @@ export function sendMessage(message: StoredMessage | PayloadMessage, logId?: str
                 
                 // this would contain the acknowledgement / reply
                 if (message.nonce === data.payload.nonce) {
+                    // save extra data
+                    if ((message as StoredMessage).id) {
+                        await Database.extraMessages.add({
+                            messageId: (message as StoredMessage).id ?? 0,
+                            encryptedPayload: securedMessage.encryptedPayload.ciphertext,
+                            digitalSignature: Buffer.from(securedMessage.signature).toString('base64')
+                        });
+                    }
+                    
+
                     // resolve with response payload
                     resolve(data.payload);
 
@@ -503,6 +534,12 @@ export async function createGroup(user: User, name: string, members: Contact[]) 
         encryptionKey: uuidv4(),
         createdAt: new Date().getTime()
     }
+
+    // check if group already exists
+    if (await Database.groups.where({ name }).first()) {
+        throw new Error('Group with this name already exists!');
+    }
+
     await Database.groups.add(group);
     const groupManager = new GroupManager(group);
     SimpleObjectStore.groupManagers.push(groupManager);

@@ -5,6 +5,7 @@ import AppData from '../models/AppData';
 import Contact from '../models/Contact';
 import Group from '../models/Group';
 import Log from '../models/Log';
+import ExtraStoredMessage from '../models/message/ExtraStoredMessage';
 import StoredMessage from '../models/message/StoredMessage';
 
 class Database extends Dexie {
@@ -13,17 +14,19 @@ class Database extends Dexie {
     app!: Table<AppData>;
     logs!: Table<Log>;
     groups!: Table<Group>;
+    extraMessages!: Table<ExtraStoredMessage>;
 
     logsSubscription: Subscription;
 
     constructor() {
         super('decent-db');
-        this.version(14).stores({
+        this.version(16).stores({
             messages: '++id, [nonce+senderUsername+createdAt], receiverUsername, status, senderUsername',
-            contacts: '++id, username',
+            contacts: 'username',
             app: 'type',
             logs: '++id, done, groupId, timestamp',
-            groups: '++id, [name+createdAt]'
+            groups: '++id, [name+createdAt]',
+            extraMessages: '++id, messageId'
         });
 
         this.on('ready', () => {

@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, DeleteForever, ReplayCircleFilledOutlined } from "@mui/icons-material";
-import { Box, Divider, Grid, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Divider, Grid, IconButton, Stack, Typography, Button } from "@mui/material";
 import { useContext, useEffect, useState } from "react";
 import { Globals } from "../Constants";
 import Group from "../models/Group";
@@ -7,6 +7,10 @@ import Blockchain from "../utils/Blockchain";
 import { GroupManager } from "../utils/GroupManager";
 import { Context, SimpleObjectStore } from "../utils/Store";
 import Database from "../utils/Database";
+import { messageQueue } from "../utils/MessageQueue";
+import MessageType from "../enums/MessageType";
+import { v4 } from "uuid";
+import { createPayloadMessage, sendMessage } from "../utils/Peer";
 
 const BlockChainDebug = () => {
     const {state, dispatch} = useContext(Context);
@@ -41,10 +45,60 @@ const BlockChainDebug = () => {
             });
         } 
     }
+
+    const resendInvites = () => {
+        const payload = JSON.stringify(groupManager?.group);
+
+        groupManager?.group.members.forEach(contact => {
+            messageQueue.addMessage({
+                type: MessageType.CreateGroup,
+                senderUsername: SimpleObjectStore.user!.username,
+                receiverUsername: contact.username,
+                createdAt: new Date().getTime(),
+                payload,
+                nonce: v4()
+            });
+        });
+    }
+
+    const pullFromBlockCreator = () => {
+        const performPull = async () => {
+            const connection = groupManager!.blockCreatorConnection!;
+            const msg = await createPayloadMessage(JSON.stringify({
+                group: {
+                    name: groupManager!.group.name,
+                    createdAt: groupManager!.group.createdAt
+                }
+            }), MessageType.PullAllBlocks, groupManager!.roundRobinList[groupManager!.roundRobinIndex].username);
+
+            const reply = await sendMessage(msg, v4(), connection);
+            if (reply.blockchain && reply.blockchain.blocks) {
+                const gm = SimpleObjectStore.groupManagers.find(x => x.group.name === state.currentOpenedChat.data.name && x.group.createdAt === (state.currentOpenedChat.data as Group).createdAt);
+                if (gm) {
+                    gm.group.blockchain = reply.blockchain;
+
+                
+                    Database.groups.update(groupManager!.group, {
+                        blockchain: reply.blockchain
+                    });
+                }
+            }
+        }
+
+        if (groupManager!.blockCreatorConnection === null) {
+            console.error('Not connected to block creator, reconnecting!');
+            groupManager!.reconnect().then(() => {
+                performPull();
+            });
+        }
+        else {
+            performPull();
+        }
+    }
     
 
     return (
-        <Box sx={{ maxWidth: '20rem' }}>
+        <Box sx={{ maxWidth: '20rem', overflow: 'auto' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2.5, bgcolor: 'primary.main', gap: 1, alignItems: 'center' }}>
                 <Typography variant="h6" component="div" sx={{ color: 'white' }}>Blockchain Debug View</Typography>
                 <DeleteForever sx={{ color: 'white', cursor: 'pointer' }} onClick={() => deleteGroupMessages()}></DeleteForever>
@@ -58,7 +112,7 @@ const BlockChainDebug = () => {
                             </IconButton>
                             <Box sx={{ p: 1 }}>
                                 {
-                                    viewingBlockIndex === -1 ? (
+                                    viewingBlockIndex === -1 || !groupManager.group.blockchain || !groupManager.group.blockchain!.blocks[viewingBlockIndex] ? (
                                         <Typography variant="h6" component="div">No blocks</Typography>
                                     ) : (
                                         <Box>
@@ -73,7 +127,7 @@ const BlockChainDebug = () => {
                                     )
                                 }
                             </Box>
-                            <IconButton color="primary" onClick={() => setViewingBlockIndex(viewingBlockIndex + 1)} disabled={viewingBlockIndex === -1 || viewingBlockIndex >= groupManager.group.blockchain!.blocks.length - 1}>
+                            <IconButton color="primary" onClick={() => setViewingBlockIndex(viewingBlockIndex + 1)} disabled={viewingBlockIndex === -1 || (groupManager.group.blockchain && viewingBlockIndex >= groupManager.group.blockchain!.blocks.length - 1)}>
                                 <ArrowRight sx={{ fontSize: '2.5rem' }}></ArrowRight>
                             </IconButton>
                         </Stack>
@@ -108,9 +162,15 @@ const BlockChainDebug = () => {
                             <Typography variant="body2" component="div" sx={{mt: 2}}>
                                 Time elapsed: {timer} seconds
                             </Typography>
-                        </Box>                        
+                        </Box>
                         {
-                            groupManager.roundRobinIndex >= 0 && groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username && (
+                            groupManager.group.admins.findIndex(x => x.username === SimpleObjectStore.user?.username) !== -1 && (
+                                <Button variant="contained" sx={{ m: 1, width: '-webkit-fill-available' }} onClick={() => resendInvites()}>Resend Invites</Button> 
+                            )
+                        }
+                                               
+                        {
+                            groupManager.roundRobinIndex >= 0 && groupManager.roundRobinList[groupManager.roundRobinIndex].username === SimpleObjectStore.user?.username ? (
                                 <Box sx={{ my: 2, pb: 1, boxShadow: 3 }}>
                                     <Box sx={{ p: 2, bgcolor: 'primary.main' }}>
                                         <Typography variant="h6" component="div" sx={{ color: 'white' }}>Creating Block #{groupManager.group.blockchain ? groupManager.group.blockchain.blocks.length : 0 }</Typography>
@@ -135,6 +195,8 @@ const BlockChainDebug = () => {
                                         </Box>
                                     )}                                                   
                                 </Box>
+                            ) : (
+                                <Button variant="contained" sx={{ m: 1, width: '-webkit-fill-available' }} onClick={() => pullFromBlockCreator()}>Pull Block Creator</Button> 
                             )
                         }
                     </>

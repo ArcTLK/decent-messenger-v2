@@ -61,7 +61,7 @@ export default class PeerBank {
                             this.removeLRU();
                         }
 
-                        if (this.peers[username]) {
+                        if (!this.peers[username]) {
                             // does not exist
                             ++this.peerCount;
                         }

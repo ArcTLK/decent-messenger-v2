@@ -11,7 +11,8 @@ enum MessageType {
     Answer = 'Answer',
     Heartbeat = 'Heartbeat',
     GroupMessage = 'Group Message',
-    IAmNotBlockCreator = 'I am not block creator'
+    IAmNotBlockCreator = 'I am not block creator',
+    PullAllBlocks = 'Pull all blocks'
 }
 
 
