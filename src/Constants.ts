@@ -1,7 +1,7 @@
 export const Globals = {
     api: {
         protocol: 'https',
-        host: 'api.decent-messenger.me',
+        host: 'decentmessenger.herokuapp.com',
         port: 443,
         endpoint: {
             peerjs: '/peerjs',
